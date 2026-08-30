@@ -1,15 +1,18 @@
 {
   "expo": {
-    "name": "at-the-bar",
+    "name": "At The Bar",
     "slug": "at-the-bar",
+    "scheme": "atthebar",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.atthebar.app"
     },
     "android": {
+      "package": "com.atthebar.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -20,6 +23,24 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-status-bar",
+      "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "At The Bar checks whether you are at a bar so friends can see where you are drinking.",
+          "locationAlwaysAndWhenInUsePermission": "At The Bar checks in the background whether you are at a bar. Your location is only shared with friends when you are at one.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
     }
   }
 }

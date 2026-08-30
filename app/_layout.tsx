@@ -41,7 +41,7 @@ function RootNavigator() {
       <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="friend/[id]" options={{ title: 'Friend' }} />
-      <Stack.Screen name="invite" options={{ title: 'Invite' }} />
+      <Stack.Screen name="redeem" options={{ title: 'Invite' }} />
     </Stack>
   );
 }

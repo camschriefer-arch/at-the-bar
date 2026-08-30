@@ -34,7 +34,7 @@ Deno.serve(async (request: Request) => {
   const { email, token, inviterName } = (await request.json()) as InviteRequest;
   if (!email || !token) return json({ error: 'email and token are required' }, 400);
 
-  const baseUrl = Deno.env.get('APP_INVITE_BASE_URL') ?? 'https://atthebar.app/invite';
+  const baseUrl = Deno.env.get('APP_INVITE_BASE_URL') ?? 'https://atthebar.app/redeem';
   const link = `${baseUrl}?token=${encodeURIComponent(token)}`;
   const from = Deno.env.get('INVITE_FROM_EMAIL') ?? 'At The Bar <invites@atthebar.app>';
   const who = inviterName ?? user.user.email ?? 'A friend';

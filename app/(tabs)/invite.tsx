@@ -29,7 +29,7 @@ export default function InviteScreen() {
             : 'Friend request sent. They will see it in the app.'
         );
       } else {
-        const url = Linking.createURL('/invite', { queryParams: { token: result.token } });
+        const url = Linking.createURL('/redeem', { queryParams: { token: result.token } });
         await Share.share({
           message: `Join me on At The Bar: ${url}`,
         });

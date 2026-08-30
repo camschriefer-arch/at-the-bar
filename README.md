@@ -62,10 +62,10 @@ Your coordinates never leave your device. The app downloads the bars for a coars
 
 ## Invite emails
 
-`invite_by_email` returns a token; the app shares an `atthebar://invite?token=…` link through the OS share sheet. To send real email instead, deploy the optional edge function and give it a Resend key:
+`invite_by_email` returns a token; the app shares an `atthebar:///redeem?token=…` link through the OS share sheet. To send real email instead, deploy the optional edge function and give it a Resend key:
 
 ```sh
-supabase secrets set RESEND_API_KEY=... INVITE_FROM_EMAIL='At The Bar <invites@yourdomain>' APP_INVITE_BASE_URL=https://yourdomain/invite
+supabase secrets set RESEND_API_KEY=... INVITE_FROM_EMAIL='At The Bar <invites@yourdomain>' APP_INVITE_BASE_URL=https://yourdomain/redeem
 supabase functions deploy send-invite
 ```
 

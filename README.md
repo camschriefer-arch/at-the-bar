@@ -54,7 +54,7 @@ Your coordinates never leave your device. The app downloads the bars for a coars
    npx expo run:android      # or: npx expo run:ios (requires macOS)
    ```
 
-   Google Maps on Android needs an API key in `app.json` under `android.config.googleMaps.apiKey`.
+   Maps use Google on both platforms, so `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` must be set before the native build — `app.config.js` injects it into `ios.config.googleMapsApiKey` and `android.config.googleMaps.apiKey`. Enable the Maps SDK for Android and for iOS on the key and restrict it to `com.atthebar.app`.
 
 ## Invite emails
 

@@ -9,7 +9,7 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.atthebar.app"
+      "bundleIdentifier": "com.camschriefer.atthebar"
     },
     "android": {
       "package": "com.atthebar.app",

@@ -49,6 +49,13 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "655502fc-3dfd-4f2a-8c2d-b870cf369e9b"
+      }
+    },
+    "owner": "camschriefer"
   }
 }

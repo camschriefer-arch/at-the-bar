@@ -6,6 +6,7 @@ iOS + Android app that shows which of your friends are out at a bar right now, a
 - The phone checks whether you are within **0.1 miles** of a bar. If you are, your status becomes _At the bar_ with the bar's name.
 - Friends who accepted your request see that status and, on your profile, a map pin on the bar.
 - Friends get a push notification when you arrive at or leave a bar ("Bob is at the bar"), naming you but not the bar.
+- Your profile carries a photo of you and a gallery of the drinks you post (bar, drink, note, 1–5 stars), which accepted friends browse from your friend screen.
 - When you are not at a bar, friends see nothing at all.
 
 ## Privacy model
@@ -24,6 +25,7 @@ Your coordinates never leave your device. The app downloads the bars for a coars
 | Backend | Supabase: Postgres + PostGIS, auth, row level security |
 | Bar catalog | OpenStreetMap `amenity=bar|pub`, imported per state |
 | Push | `expo-notifications` + Expo Push Service, fanned out by the `send-push` edge function |
+| Photos | `expo-image-picker` + private Supabase Storage buckets, rendered from signed URLs with `expo-image` |
 
 ## Setup
 
@@ -84,6 +86,14 @@ select cron.schedule('send-push', '* * * * *', $$
   );
 $$);
 ```
+
+## Photos
+
+Profile pictures live in the `avatars` bucket and drink photos in `drinks`, both private. Objects are stored as `<user id>/<timestamp>.<ext>`, and the storage policies read that prefix: you may write only under your own id, and an object is readable by its owner and their accepted friends — the same rule as `drink_posts` rows. The client never holds a public URL; it mints a one-hour signed URL per image.
+
+`drink_posts` keeps a snapshot of the bar name alongside the optional `bar_id`, because the catalog is reimported from OpenStreetMap and a bar can vanish from it while the photo should not. Ratings are constrained to 1–5 in the database.
+
+The buckets and their policies are created by `supabase/migrations/20260830000004_photos.sql`, which skips the storage half when the `storage` schema is absent so the migration still applies to a plain Postgres in tests.
 
 ## Invite emails
 

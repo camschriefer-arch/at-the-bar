@@ -1,25 +1,44 @@
 import { Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 
+import { Avatar } from '../../components/Avatar';
+import { DrinkGallery } from '../../components/DrinkGallery';
 import { fetchFriendFeed } from '../../lib/api';
+import { fetchDrinkPosts, signedAvatarUrl, signedDrinkUrls } from '../../lib/photos';
 import { colors, spacing } from '../../lib/theme';
-import type { FriendFeedRow } from '../../lib/types';
+import type { DrinkPost, FriendFeedRow } from '../../lib/types';
 
 const MAP_SPAN_DEGREES = 0.01;
 
 export default function FriendScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [friend, setFriend] = useState<FriendFeedRow | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [posts, setPosts] = useState<DrinkPost[]>([]);
+  const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
       const feed = await fetchFriendFeed();
-      setFriend(feed.find((row) => row.friend_id === id) ?? null);
+      const row = feed.find((entry) => entry.friend_id === id) ?? null;
+      setFriend(row);
       setError(null);
+
+      if (!row) return;
+
+      // Only reachable for an accepted friend; the database enforces the same rule.
+      const drinks = await fetchDrinkPosts(row.friend_id);
+      setPosts(drinks);
+      const [avatar, urls] = await Promise.all([
+        signedAvatarUrl(row.avatar_url),
+        signedDrinkUrls(drinks),
+      ]);
+      setAvatarUrl(avatar);
+      setPhotoUrls(urls);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not load this friend');
     } finally {
@@ -52,22 +71,25 @@ export default function FriendScreen() {
   const atBar = friend.bar_id !== null && friend.bar_lat !== null && friend.bar_lng !== null;
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Stack.Screen options={{ title: friend.display_name }} />
 
       <View style={styles.header}>
-        <Text style={styles.name}>{friend.display_name}</Text>
-        {atBar ? (
-          <>
-            <Text style={styles.status}>At the bar</Text>
-            <Text style={styles.barName}>{friend.bar_name}</Text>
-            <Text style={styles.muted}>
-              {[friend.bar_city, friend.bar_state].filter(Boolean).join(', ')}
-            </Text>
-          </>
-        ) : (
-          <Text style={styles.muted}>Not at a bar right now.</Text>
-        )}
+        <Avatar uri={avatarUrl} name={friend.display_name} />
+        <View style={styles.headerText}>
+          <Text style={styles.name}>{friend.display_name}</Text>
+          {atBar ? (
+            <>
+              <Text style={styles.status}>At the bar</Text>
+              <Text style={styles.barName}>{friend.bar_name}</Text>
+              <Text style={styles.muted}>
+                {[friend.bar_city, friend.bar_state].filter(Boolean).join(', ')}
+              </Text>
+            </>
+          ) : (
+            <Text style={styles.muted}>Not at a bar right now.</Text>
+          )}
+        </View>
       </View>
 
       {atBar ? (
@@ -95,7 +117,16 @@ export default function FriendScreen() {
           </Text>
         </View>
       )}
-    </View>
+
+      <View style={styles.gallery}>
+        <Text style={styles.status}>Their drinks</Text>
+        <DrinkGallery
+          posts={posts}
+          urls={photoUrls}
+          emptyLabel={`${friend.display_name} has not posted any drinks yet.`}
+        />
+      </View>
+    </ScrollView>
   );
 }
 
@@ -110,8 +141,21 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
   },
+  content: {
+    paddingBottom: spacing.lg,
+  },
   header: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.md,
+    padding: spacing.md,
+  },
+  headerText: {
+    flexShrink: 1,
     gap: spacing.xs,
+  },
+  gallery: {
+    gap: spacing.sm,
     padding: spacing.md,
   },
   name: {
@@ -134,7 +178,7 @@ const styles = StyleSheet.create({
     color: colors.muted,
   },
   map: {
-    flex: 1,
+    height: 260,
   },
   privacyNote: {
     padding: spacing.md,

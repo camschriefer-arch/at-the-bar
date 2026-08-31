@@ -28,6 +28,26 @@ export type FriendFeedRow = {
   arrived_at: string | null;
 };
 
+export type DrinkPost = {
+  id: string;
+  user_id: string;
+  bar_id: string | null;
+  bar_name: string;
+  beer_name: string;
+  description: string | null;
+  rating: number;
+  image_path: string;
+  created_at: string;
+};
+
+export type DrinkPostDraft = {
+  barId: string | null;
+  barName: string;
+  beerName: string;
+  description: string;
+  rating: number;
+};
+
 export type FriendRequest = {
   id: string;
   requester_id: string;

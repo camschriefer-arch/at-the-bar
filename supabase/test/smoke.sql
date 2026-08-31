@@ -66,6 +66,56 @@ select body = 'ada has left the bar' as departure_body_names_person_only
 select count(*) = 0 as stranger_not_notified from notification_outbox
   where recipient_id = '33333333-3333-3333-3333-333333333333';
 
+-- Drink photos have the same audience as a status, minus the "only while at a
+-- bar" rule: the owner and the friends they accepted, nobody else.
+set role authenticated;
+set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+insert into drink_posts (user_id, bar_id, bar_name, beer_name, description, rating, image_path)
+values (
+  '11111111-1111-1111-1111-111111111111',
+  '44444444-4444-4444-4444-444444444444',
+  'The Long Pour', 'Cellar Pils', 'Crisp and cold.', 5,
+  '11111111-1111-1111-1111-111111111111/1.jpg'
+);
+select count(*) = 1 as owner_sees_own_drinks
+  from drink_posts_for('11111111-1111-1111-1111-111111111111');
+
+set request.jwt.claim.sub = '22222222-2222-2222-2222-222222222222';
+select count(*) = 1 as friend_sees_drinks
+  from drink_posts_for('11111111-1111-1111-1111-111111111111');
+
+set request.jwt.claim.sub = '33333333-3333-3333-3333-333333333333';
+select count(*) = 0 as stranger_sees_no_drinks
+  from drink_posts_for('11111111-1111-1111-1111-111111111111');
+select count(*) = 0 as stranger_cannot_read_table from drink_posts;
+
+do $$ begin
+  insert into drink_posts (user_id, bar_name, beer_name, rating, image_path)
+  values ('11111111-1111-1111-1111-111111111111', 'The Long Pour', 'Forgery', 1, 'forged.jpg');
+  raise exception 'a stranger posted as someone else';
+exception
+  when insufficient_privilege then null;
+end $$;
+select true as stranger_cannot_post_as_someone_else;
+
+do $$ begin
+  insert into drink_posts (user_id, bar_name, beer_name, rating, image_path)
+  values (
+    '33333333-3333-3333-3333-333333333333', 'The Long Pour', 'Overrated', 6,
+    '33333333-3333-3333-3333-333333333333/1.jpg'
+  );
+  raise exception 'a rating outside 1-5 was accepted';
+exception
+  when check_violation then null;
+end $$;
+select true as rating_must_be_one_to_five;
+
+reset role;
+-- Storage policies key off the <owner uuid>/<file> prefix of the object name.
+select storage_object_owner('11111111-1111-1111-1111-111111111111/1.jpg')
+    = '11111111-1111-1111-1111-111111111111'::uuid as storage_owner_from_path;
+select storage_object_owner('not-a-uuid/1.jpg') is null as malformed_path_has_no_owner;
+
 -- The anon key ships inside the app, so nothing beyond the sender's own
 -- functions may be reachable with it.
 select not bool_or(has_function_privilege('anon', p.oid, 'execute')) as anon_cannot_execute_rpcs
@@ -75,7 +125,7 @@ select not bool_or(has_function_privilege('anon', p.oid, 'execute')) as anon_can
     and p.proname in ('claim_push_batch', 'mark_push_sent', 'mark_push_failed',
       'drop_push_tokens', 'prune_notification_outbox', 'register_push_token',
       'unregister_push_token', 'set_current_bar', 'bars_in_bbox', 'invite_by_email',
-      'respond_to_friend_request', 'accept_invite', 'friend_feed');
+      'respond_to_friend_request', 'accept_invite', 'friend_feed', 'drink_posts_for');
 
 select not bool_or(has_function_privilege('authenticated', p.oid, 'execute')) as sender_rpcs_are_service_role_only
   from pg_proc p

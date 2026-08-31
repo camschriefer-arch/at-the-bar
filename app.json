@@ -29,6 +29,13 @@
       "expo-status-bar",
       "expo-secure-store",
       "expo-notifications",
+      "expo-image",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "At The Bar needs your photo library so you can post pictures of your drinks."
+        }
+      ],
       [
         "expo-location",
         {

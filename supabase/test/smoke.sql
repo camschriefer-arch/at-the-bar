@@ -110,7 +110,26 @@ exception
 end $$;
 select true as rating_must_be_one_to_five;
 
+-- Grace removes Ada. The friendship goes both ways, so each of them loses sight
+-- of the other's status and drinks, Ada is emailed, and nothing is pushed.
+set request.jwt.claim.sub = '22222222-2222-2222-2222-222222222222';
+do $$ begin perform remove_friend('11111111-1111-1111-1111-111111111111'); end $$;
+select count(*) = 0 as remover_feed_empty from friend_feed();
+select count(*) = 0 as friendship_row_is_gone from friendships;
+select count(*) = 0 as remover_loses_drinks
+  from drink_posts_for('11111111-1111-1111-1111-111111111111');
+
+set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+select count(*) = 0 as removed_person_feed_empty from friend_feed();
+
 reset role;
+select count(*) = 1 as removal_queues_one_email from email_outbox;
+select count(*) = 1 as email_goes_to_the_removed_person from email_outbox
+  where recipient_email = 'ada@example.com';
+select subject = 'grace removed you on At The Bar' as email_names_the_remover
+  from email_outbox where recipient_email = 'ada@example.com';
+select count(*) = 2 as removal_pushes_nothing from notification_outbox;
+
 -- Storage policies key off the <owner uuid>/<file> prefix of the object name.
 select storage_object_owner('11111111-1111-1111-1111-111111111111/1.jpg')
     = '11111111-1111-1111-1111-111111111111'::uuid as storage_owner_from_path;
@@ -125,11 +144,14 @@ select not bool_or(has_function_privilege('anon', p.oid, 'execute')) as anon_can
     and p.proname in ('claim_push_batch', 'mark_push_sent', 'mark_push_failed',
       'drop_push_tokens', 'prune_notification_outbox', 'register_push_token',
       'unregister_push_token', 'set_current_bar', 'bars_in_bbox', 'invite_by_email',
-      'respond_to_friend_request', 'accept_invite', 'friend_feed', 'drink_posts_for');
+      'respond_to_friend_request', 'accept_invite', 'friend_feed', 'drink_posts_for',
+      'remove_friend', 'claim_email_batch', 'mark_email_sent', 'mark_email_failed',
+      'prune_email_outbox');
 
 select not bool_or(has_function_privilege('authenticated', p.oid, 'execute')) as sender_rpcs_are_service_role_only
   from pg_proc p
   join pg_namespace n on n.oid = p.pronamespace
   where n.nspname = 'public'
     and p.proname in ('claim_push_batch', 'mark_push_sent', 'mark_push_failed',
-      'drop_push_tokens', 'prune_notification_outbox');
+      'drop_push_tokens', 'prune_notification_outbox', 'claim_email_batch',
+      'mark_email_sent', 'mark_email_failed', 'prune_email_outbox');

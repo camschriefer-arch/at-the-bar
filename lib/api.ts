@@ -72,13 +72,18 @@ export async function fetchMyStatus(userId: string): Promise<{ status: UserStatu
   return { status: status as UserStatus, bar: resolved ?? null };
 }
 
-export async function removeFriend(friendId: string, userId: string): Promise<void> {
-  const { error } = await supabase
-    .from('friendships')
-    .delete()
-    .or(
-      `and(requester_id.eq.${userId},addressee_id.eq.${friendId}),and(requester_id.eq.${friendId},addressee_id.eq.${userId})`
-    );
-
+/**
+ * Ends the friendship both ways. The database queues an email to the person who
+ * was removed — deliberately not a push, which is reserved for bar events — and
+ * this only nudges the sender so it goes out without waiting for the cron sweep.
+ */
+export async function removeFriend(friendId: string): Promise<void> {
+  const { error } = await supabase.rpc('remove_friend', { p_friend_id: friendId });
   if (error) throw error;
+
+  try {
+    await supabase.functions.invoke('send-email', { body: {} });
+  } catch {
+    // Delivery is the cron sweep's problem from here.
+  }
 }

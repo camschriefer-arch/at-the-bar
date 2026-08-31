@@ -1,11 +1,12 @@
-import { Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 
 import { Avatar } from '../../components/Avatar';
+import { Button } from '../../components/Button';
 import { DrinkGallery } from '../../components/DrinkGallery';
-import { fetchFriendFeed } from '../../lib/api';
+import { fetchFriendFeed, removeFriend } from '../../lib/api';
 import { fetchDrinkPosts, signedAvatarUrl, signedDrinkUrls } from '../../lib/photos';
 import { colors, spacing } from '../../lib/theme';
 import type { DrinkPost, FriendFeedRow } from '../../lib/types';
@@ -14,11 +15,13 @@ const MAP_SPAN_DEGREES = 0.01;
 
 export default function FriendScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
   const [friend, setFriend] = useState<FriendFeedRow | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [posts, setPosts] = useState<DrinkPost[]>([]);
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
+  const [removing, setRemoving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -51,6 +54,28 @@ export default function FriendScreen() {
       void load();
     }, [load])
   );
+
+  const remove = async (name: string) => {
+    setRemoving(true);
+    try {
+      await removeFriend(id);
+      router.back();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : `Could not remove ${name}`);
+      setRemoving(false);
+    }
+  };
+
+  const confirmRemove = (name: string) => {
+    Alert.alert(
+      `Remove ${name}?`,
+      `You will stop seeing each other's status and drinks. ${name} gets an email letting them know.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Remove', style: 'destructive', onPress: () => void remove(name) },
+      ]
+    );
+  };
 
   if (loading) {
     return (
@@ -126,6 +151,15 @@ export default function FriendScreen() {
           emptyLabel={`${friend.display_name} has not posted any drinks yet.`}
         />
       </View>
+
+      <View style={styles.footer}>
+        <Button
+          title="Remove friend"
+          variant="secondary"
+          loading={removing}
+          onPress={() => confirmRemove(friend.display_name)}
+        />
+      </View>
     </ScrollView>
   );
 }
@@ -156,6 +190,9 @@ const styles = StyleSheet.create({
   },
   gallery: {
     gap: spacing.sm,
+    padding: spacing.md,
+  },
+  footer: {
     padding: spacing.md,
   },
   name: {

@@ -6,6 +6,7 @@ iOS + Android app that shows which of your friends are out at a bar right now, a
 - The phone checks whether you are within **0.1 miles** of a bar. If you are, your status becomes _At the bar_ with the bar's name.
 - Friends who accepted your request see that status and, on your profile, a map pin on the bar.
 - Friends get a push notification when you arrive at or leave a bar ("Bob is at the bar"), naming you but not the bar.
+- Removing a friend cuts the tie both ways; they get an email about it, never a push.
 - Your profile carries a photo of you and a gallery of the drinks you post (bar, drink, note, 1–5 stars), which accepted friends browse from your friend screen.
 - When you are not at a bar, friends see nothing at all.
 
@@ -95,13 +96,31 @@ Profile pictures live in the `avatars` bucket and drink photos in `drinks`, both
 
 The buckets and their policies are created by `supabase/migrations/20260830000004_photos.sql`, which skips the storage half when the `storage` schema is absent so the migration still applies to a plain Postgres in tests.
 
-## Invite emails
+## Removing a friend
 
-`invite_by_email` returns a token; the app shares an `atthebar:///redeem?token=…` link through the OS share sheet. To send real email instead, deploy the optional edge function and give it a Resend key:
+`remove_friend` deletes the friendship whichever direction it was made in, so both people immediately lose the other's status and drink photos. A trigger on the delete queues one `email_outbox` row for the person who was removed, inside the same transaction — the client is never handed their address, and nothing is queued when the row disappears through a cascade instead of a person.
+
+The notice is email on purpose: a push is how the app says someone is out, and being dropped should not arrive that way.
+
+## Emails
+
+`invite_by_email` returns a token; the app shares an `atthebar:///redeem?token=…` link through the OS share sheet. To send real email instead, deploy the edge functions and give them a Resend key:
 
 ```sh
 supabase secrets set RESEND_API_KEY=... INVITE_FROM_EMAIL='At The Bar <invites@yourdomain>' APP_INVITE_BASE_URL=https://yourdomain/redeem
-supabase functions deploy send-invite
+supabase functions deploy send-invite   # invite links, called with the sender's token
+supabase functions deploy send-email    # drains email_outbox with the service role
+```
+
+`send-email` claims rows the same way `send-push` does, so a provider outage retries instead of losing the notice. The app pokes it right after a removal; schedule the same sweep as the push queue so a dropped request still goes out:
+
+```sql
+select cron.schedule('send-email', '* * * * *', $$
+  select net.http_post(
+    url := 'https://<ref>.functions.supabase.co/send-email',
+    headers := jsonb_build_object('Authorization', 'Bearer ' || current_setting('app.service_role_key'))
+  );
+$$);
 ```
 
 ## Checks

@@ -28,6 +28,7 @@
       "expo-router",
       "expo-status-bar",
       "expo-secure-store",
+      "expo-notifications",
       [
         "expo-location",
         {

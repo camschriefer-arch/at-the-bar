@@ -1,3 +1,4 @@
+import * as Notifications from 'expo-notifications';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
@@ -5,7 +6,10 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AuthProvider, useAuth } from '../lib/AuthProvider';
+import { registerForPushNotifications } from '../lib/notifications';
 import { colors } from '../lib/theme';
+
+type BarEventPayload = { friendId?: string };
 
 function RootNavigator() {
   const { session, loading } = useAuth();
@@ -22,6 +26,22 @@ function RootNavigator() {
       router.replace('/(tabs)');
     }
   }, [session, loading, segments, router]);
+
+  useEffect(() => {
+    if (!session) return;
+    // A refused permission is a normal outcome; the rest of the app works.
+    registerForPushNotifications().catch(() => undefined);
+  }, [session]);
+
+  // "Bob is at the bar" says nothing about where; tapping it opens Bob, which
+  // only renders his bar if the friendship still allows it.
+  const tapped = Notifications.useLastNotificationResponse();
+  useEffect(() => {
+    if (!session || !tapped) return;
+
+    const { friendId } = tapped.notification.request.content.data as BarEventPayload;
+    if (friendId) router.push(`/friend/${friendId}`);
+  }, [session, tapped, router]);
 
   if (loading) {
     return (

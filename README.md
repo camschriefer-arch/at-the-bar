@@ -5,6 +5,7 @@ iOS + Android app that shows which of your friends are out at a bar right now, a
 - Sign up with email, add friends by email invite, accept requests.
 - The phone checks whether you are within **0.1 miles** of a bar. If you are, your status becomes _At the bar_ with the bar's name.
 - Friends who accepted your request see that status and, on your profile, a map pin on the bar.
+- Friends get a push notification when you arrive at or leave a bar ("Bob is at the bar"), naming you but not the bar.
 - When you are not at a bar, friends see nothing at all.
 
 ## Privacy model
@@ -19,9 +20,10 @@ Your coordinates never leave your device. The app downloads the bars for a coars
 | --- | --- |
 | App | Expo SDK 57 (React Native), expo-router |
 | Location | `expo-location` foreground + background updates, `expo-task-manager` |
-| Maps | `react-native-maps` (Apple Maps on iOS, Google Maps on Android) |
+| Maps | `react-native-maps` with Google Maps on both platforms |
 | Backend | Supabase: Postgres + PostGIS, auth, row level security |
 | Bar catalog | OpenStreetMap `amenity=bar|pub`, imported per state |
+| Push | `expo-notifications` + Expo Push Service, fanned out by the `send-push` edge function |
 
 ## Setup
 
@@ -60,6 +62,29 @@ Your coordinates never leave your device. The app downloads the bars for a coars
    keytool -list -v -alias androiddebugkey -keystore ~/.android/debug.keystore -storepass android | grep SHA1
    ```
 
+## Push notifications
+
+A trigger on `user_status` queues one `notification_outbox` row per accepted friend whenever a user's `bar_id` goes from null to a bar ("arrived") or back ("left"); moving between two bars queues nothing, since the status is unchanged. The body names the person only — the bar is revealed when the friend taps through and passes the same RLS checks as the friends list.
+
+The `send-push` function drains that queue through the Expo Push Service. It claims rows rather than deleting them, so a failed send retries and a check-in is never lost or duplicated.
+
+```sh
+eas init                        # push tokens need an EAS project id
+eas credentials                 # upload the APNs key / FCM v1 service account
+supabase functions deploy send-push
+```
+
+The app invokes `send-push` right after a check-in so delivery is immediate. Add a sweep so nothing is stranded if that request dies with the app:
+
+```sql
+select cron.schedule('send-push', '* * * * *', $$
+  select net.http_post(
+    url := 'https://<ref>.functions.supabase.co/send-push',
+    headers := jsonb_build_object('Authorization', 'Bearer ' || current_setting('app.service_role_key'))
+  );
+$$);
+```
+
 ## Invite emails
 
 `invite_by_email` returns a token; the app shares an `atthebar:///redeem?token=…` link through the OS share sheet. To send real email instead, deploy the optional edge function and give it a Resend key:
@@ -88,6 +113,5 @@ docker exec -i atb-pg psql -U postgres -v ON_ERROR_STOP=1 < supabase/test/smoke.
 
 ## Not done yet
 
-- Push notifications when a friend arrives at a bar.
 - Blocking, and per-friend visibility controls.
 - App Store / Play Store submission (needs your developer accounts and an EAS project).

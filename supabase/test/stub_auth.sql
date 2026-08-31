@@ -17,3 +17,9 @@ do $$ begin
 exception
   when duplicate_object then null;
 end $$;
+
+do $$ begin
+  create role service_role;
+exception
+  when duplicate_object then null;
+end $$;

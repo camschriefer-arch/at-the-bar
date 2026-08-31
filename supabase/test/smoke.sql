@@ -54,4 +54,14 @@ select count(*) = 0 as friend_sees_nothing_when_home from user_status
   where user_id = '11111111-1111-1111-1111-111111111111';
 select bar_id is null as feed_row_has_no_bar from friend_feed();
 
+-- Grace was queued one arrival and one departure notice, naming Ada but not
+-- the bar. The stranger was queued nothing.
 reset role;
+select body = 'ada is at the bar' as arrival_body_names_person_only
+  from notification_outbox
+  where recipient_id = '22222222-2222-2222-2222-222222222222' and event = 'arrived';
+select body = 'ada has left the bar' as departure_body_names_person_only
+  from notification_outbox
+  where recipient_id = '22222222-2222-2222-2222-222222222222' and event = 'left';
+select count(*) = 0 as stranger_not_notified from notification_outbox
+  where recipient_id = '33333333-3333-3333-3333-333333333333';

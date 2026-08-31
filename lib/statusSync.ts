@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { barsNear } from './barCache';
 import { AT_BAR_RADIUS_METERS, nearestWithin, type LatLng } from './geo';
+import { flushPendingNotifications } from './notifications';
 import { supabase } from './supabase';
 import type { Bar } from './types';
 
@@ -50,10 +51,13 @@ export async function syncStatusForLocation(point: LatLng): Promise<ResolvedStat
     await AsyncStorage.removeItem(LAST_BAR_KEY);
   }
 
+  await flushPendingNotifications();
+
   return { bar, changed: true };
 }
 
 export async function clearStatus(): Promise<void> {
   await AsyncStorage.removeItem(LAST_BAR_KEY);
   await supabase.rpc('set_current_bar', { p_bar_id: null });
+  await flushPendingNotifications();
 }

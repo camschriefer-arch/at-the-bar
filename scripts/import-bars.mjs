@@ -14,7 +14,11 @@ import { createClient } from '@supabase/supabase-js';
 
 const OVERPASS_URL = process.env.OVERPASS_URL ?? 'https://overpass-api.de/api/interpreter';
 const BATCH_SIZE = 500;
-const RETRY_DELAYS_MS = [5_000, 20_000, 60_000];
+const RETRY_DELAYS_MS = [5_000, 15_000, 30_000, 60_000, 120_000];
+
+// Overpass answers 406 to Node's default user agent, and asks clients to
+// identify themselves.
+const USER_AGENT = 'at-the-bar-importer/1.0 (+https://github.com/camschriefer-arch/at-the-bar)';
 
 const STATES = {
   AL: 'Alabama', AK: 'Alaska', AZ: 'Arizona', AR: 'Arkansas', CA: 'California',
@@ -50,10 +54,13 @@ function parseArgs(argv) {
   return args;
 }
 
-function overpassQuery(stateName) {
+// Selected by ISO code rather than name: US state relations no longer carry
+// `is_in:country_code`, and matching on the name alone would also pick up
+// same-named areas elsewhere in the world.
+function overpassQuery(stateCode) {
   return `
     [out:json][timeout:600];
-    area["boundary"="administrative"]["admin_level"="4"]["name"="${stateName}"]["is_in:country_code"="US"]->.state;
+    area["ISO3166-2"="US-${stateCode}"]["admin_level"="4"]->.state;
     (
       node["amenity"~"^(bar|pub)$"](area.state);
       way["amenity"~"^(bar|pub)$"](area.state);
@@ -63,12 +70,15 @@ function overpassQuery(stateName) {
   `;
 }
 
-async function fetchState(stateName) {
+async function fetchState(stateCode, stateName) {
   for (let attempt = 0; ; attempt += 1) {
     const response = await fetch(OVERPASS_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ data: overpassQuery(stateName) }),
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent': USER_AGENT,
+      },
+      body: new URLSearchParams({ data: overpassQuery(stateCode) }),
     });
 
     if (response.ok) return response.json();
@@ -133,8 +143,14 @@ async function main() {
     const stateName = STATES[code];
     process.stdout.write(`${code} …`);
 
-    const payload = await fetchState(stateName);
+    const payload = await fetchState(code, stateName);
     const rows = toBarRows(payload.elements ?? [], code);
+
+    // A state that returns nothing means the area lookup missed, not that the
+    // state has no bars — fail loudly instead of importing a silent gap.
+    if (rows.length === 0) {
+      throw new Error(`No bars found for ${stateName}; the Overpass area lookup likely failed.`);
+    }
 
     for (let i = 0; i < rows.length; i += BATCH_SIZE) {
       const batch = rows.slice(i, i + BATCH_SIZE);
@@ -149,7 +165,7 @@ async function main() {
     console.log(` ${rows.length} bars`);
 
     // Overpass asks clients to stay under roughly one query at a time.
-    await sleep(2_000);
+    await sleep(5_000);
   }
 
   console.log(`Imported ${total} bars across ${states.length} states.`);

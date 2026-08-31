@@ -127,9 +127,14 @@ export default function FriendsScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Not out</Text>
             {elsewhere.map((friend) => (
-              <View key={friend.friend_id} style={styles.cardMuted}>
+              <Pressable
+                key={friend.friend_id}
+                style={styles.cardMuted}
+                onPress={() =>
+                  router.push({ pathname: '/friend/[id]', params: { id: friend.friend_id } })
+                }>
                 <Text style={styles.name}>{friend.display_name}</Text>
-              </View>
+              </Pressable>
             ))}
           </View>
         ) : null

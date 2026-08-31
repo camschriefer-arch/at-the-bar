@@ -1,7 +1,9 @@
 import type { Session } from '@supabase/supabase-js';
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
+import { stopBackgroundUpdates } from './locationService';
 import { unregisterPushNotifications } from './notifications';
+import { clearStatus } from './statusSync';
 import { supabase } from './supabase';
 
 type AuthContextValue = {
@@ -45,7 +47,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (error) throw error;
       },
       signOut: async () => {
-        await unregisterPushNotifications();
+        // Signing out has to stop sharing: otherwise the account stays at its
+        // last bar for friends, and the device's cached bar id makes the next
+        // account's first check-in look like a no-op.
+        await Promise.allSettled([
+          stopBackgroundUpdates(),
+          clearStatus(),
+          unregisterPushNotifications(),
+        ]);
+
         const { error } = await supabase.auth.signOut();
         if (error) throw error;
       },

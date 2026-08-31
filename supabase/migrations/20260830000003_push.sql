@@ -198,13 +198,17 @@ as $$
     or (sent_at is null and attempts >= 5 and created_at < now() - interval '7 days');
 $$;
 
-revoke all on function register_push_token (text, text) from public;
-revoke all on function unregister_push_token (text) from public;
-revoke all on function claim_push_batch (integer) from public;
-revoke all on function mark_push_sent (bigint[]) from public;
-revoke all on function mark_push_failed (bigint[], text) from public;
-revoke all on function drop_push_tokens (text[]) from public;
-revoke all on function prune_notification_outbox () from public;
+-- Postgres grants EXECUTE to public by default and Supabase grants it to anon
+-- and authenticated on top, so every role has to be named explicitly here: a
+-- security definer function that is merely revoked from public is still
+-- callable with the anon key that ships inside the app.
+revoke all on function register_push_token (text, text) from public, anon, authenticated;
+revoke all on function unregister_push_token (text) from public, anon, authenticated;
+revoke all on function claim_push_batch (integer) from public, anon, authenticated;
+revoke all on function mark_push_sent (bigint[]) from public, anon, authenticated;
+revoke all on function mark_push_failed (bigint[], text) from public, anon, authenticated;
+revoke all on function drop_push_tokens (text[]) from public, anon, authenticated;
+revoke all on function prune_notification_outbox () from public, anon, authenticated;
 
 grant execute on function register_push_token (text, text) to authenticated;
 grant execute on function unregister_push_token (text) to authenticated;
@@ -213,3 +217,12 @@ grant execute on function mark_push_sent (bigint[]) to service_role;
 grant execute on function mark_push_failed (bigint[], text) to service_role;
 grant execute on function drop_push_tokens (text[]) to service_role;
 grant execute on function prune_notification_outbox () to service_role;
+
+-- Same oversight in the first policies migration: these are meant for signed-in
+-- users only, but anon kept the default grant.
+revoke all on function bars_in_bbox (double precision, double precision, double precision, double precision, integer) from anon;
+revoke all on function set_current_bar (uuid) from anon;
+revoke all on function invite_by_email (text) from anon;
+revoke all on function respond_to_friend_request (uuid, boolean) from anon;
+revoke all on function accept_invite (text) from anon;
+revoke all on function friend_feed () from anon;

@@ -65,3 +65,21 @@ select body = 'ada has left the bar' as departure_body_names_person_only
   where recipient_id = '22222222-2222-2222-2222-222222222222' and event = 'left';
 select count(*) = 0 as stranger_not_notified from notification_outbox
   where recipient_id = '33333333-3333-3333-3333-333333333333';
+
+-- The anon key ships inside the app, so nothing beyond the sender's own
+-- functions may be reachable with it.
+select not bool_or(has_function_privilege('anon', p.oid, 'execute')) as anon_cannot_execute_rpcs
+  from pg_proc p
+  join pg_namespace n on n.oid = p.pronamespace
+  where n.nspname = 'public'
+    and p.proname in ('claim_push_batch', 'mark_push_sent', 'mark_push_failed',
+      'drop_push_tokens', 'prune_notification_outbox', 'register_push_token',
+      'unregister_push_token', 'set_current_bar', 'bars_in_bbox', 'invite_by_email',
+      'respond_to_friend_request', 'accept_invite', 'friend_feed');
+
+select not bool_or(has_function_privilege('authenticated', p.oid, 'execute')) as sender_rpcs_are_service_role_only
+  from pg_proc p
+  join pg_namespace n on n.oid = p.pronamespace
+  where n.nspname = 'public'
+    and p.proname in ('claim_push_batch', 'mark_push_sent', 'mark_push_failed',
+      'drop_push_tokens', 'prune_notification_outbox');

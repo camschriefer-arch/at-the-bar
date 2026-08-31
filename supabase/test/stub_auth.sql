@@ -19,6 +19,16 @@ exception
 end $$;
 
 do $$ begin
+  create role anon;
+exception
+  when duplicate_object then null;
+end $$;
+
+-- Supabase grants EXECUTE on public functions to anon and authenticated, so the
+-- stub does too: without it the migrations' revokes would look like they work.
+alter default privileges in schema public grant execute on functions to anon, authenticated;
+
+do $$ begin
   create role service_role;
 exception
   when duplicate_object then null;

@@ -123,6 +123,32 @@ select cron.schedule('send-email', '* * * * *', $$
 $$);
 ```
 
+## Shipping to a phone
+
+`eas.json` defines two profiles: `preview` (internal distribution — an installable
+`.apk` on Android, an ad hoc `.ipa` on iOS) and `production` (`.aab` / App Store
+build, used for TestFlight). Both read their `EXPO_PUBLIC_*` values from EAS
+environment variables rather than a committed `.env`, so set them once per
+environment:
+
+```sh
+eas env:set --name EXPO_PUBLIC_SUPABASE_URL --value https://<ref>.supabase.co \
+  --environment production --visibility plaintext
+# ...same for EXPO_PUBLIC_SUPABASE_ANON_KEY and the two Google Maps keys
+```
+
+An iPhone build needs a paid Apple Developer account either way; TestFlight is the
+least fiddly route because it skips per-device UDID registration:
+
+```sh
+eas init
+eas build --platform ios --profile production --auto-submit
+```
+
+The Maps key restricted to bundle id `com.atthebar.app` covers every iOS build, but
+Android release builds are signed by a different key than the debug one, so add the
+release SHA-1 (`eas credentials`) to the Android Maps key or the map goes grey.
+
 ## Checks
 
 ```sh

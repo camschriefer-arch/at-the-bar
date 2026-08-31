@@ -5,7 +5,6 @@
 -- resolves the nearest bar locally and writes only a bar id.
 
 create extension if not exists postgis;
-create extension if not exists pgcrypto;
 
 create type friendship_status as enum ('pending', 'accepted', 'declined', 'blocked');
 create type invite_status as enum ('pending', 'accepted', 'revoked', 'expired');
@@ -58,7 +57,11 @@ create table invites (
   id uuid primary key default gen_random_uuid(),
   inviter_id uuid not null references profiles (id) on delete cascade,
   email text not null,
-  token text not null unique default encode(gen_random_bytes(24), 'hex'),
+  -- Two uuid4s, hyphens stripped: 244 bits of randomness from a built-in, so the
+  -- token does not depend on where a given install happens to put pgcrypto.
+  token text not null unique default (
+    replace(gen_random_uuid()::text, '-', '') || replace(gen_random_uuid()::text, '-', '')
+  ),
   status invite_status not null default 'pending',
   created_at timestamptz not null default now(),
   expires_at timestamptz not null default now() + interval '30 days',

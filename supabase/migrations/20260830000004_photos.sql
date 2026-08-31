@@ -80,6 +80,13 @@ begin
     ('drinks', 'drinks', false, 10485760, array['image/jpeg', 'image/png', 'image/webp'])
   on conflict (id) do nothing;
 
+  -- Idempotent so re-applying against a project that already has the buckets
+  -- (a retried push) does not fail on a duplicate policy name.
+  execute 'drop policy if exists photos_insert on storage.objects';
+  execute 'drop policy if exists photos_select on storage.objects';
+  execute 'drop policy if exists photos_update on storage.objects';
+  execute 'drop policy if exists photos_delete on storage.objects';
+
   execute $policy$
     create policy photos_insert on storage.objects for insert to authenticated
       with check (

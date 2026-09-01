@@ -14,9 +14,8 @@
     "android": {
       "package": "com.atthebar.app",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#0E0E10",
         "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false
@@ -27,6 +26,14 @@
     "plugins": [
       "expo-router",
       "expo-status-bar",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0E0E10",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 220
+        }
+      ],
       "expo-secure-store",
       "expo-notifications",
       "expo-image",

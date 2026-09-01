@@ -3,6 +3,7 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 
 import { stopBackgroundUpdates } from './locationService';
 import { unregisterPushNotifications } from './notifications';
+import { setSharingEnabled } from './sharing';
 import { clearStatus } from './statusSync';
 import { supabase } from './supabase';
 
@@ -53,6 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await Promise.allSettled([
           stopBackgroundUpdates(),
           clearStatus(),
+          setSharingEnabled(true),
           unregisterPushNotifications(),
         ]);
 

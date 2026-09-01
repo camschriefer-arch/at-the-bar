@@ -1,6 +1,7 @@
 import type { LocationObject } from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 
+import { isSharingEnabled } from './sharing';
 import { syncStatusForLocation } from './statusSync';
 
 export const BACKGROUND_LOCATION_TASK = 'atb-background-location';
@@ -17,6 +18,8 @@ TaskManager.defineTask<LocationTaskData>(BACKGROUND_LOCATION_TASK, async ({ data
 
   const latest = data?.locations?.at(-1);
   if (!latest) return;
+
+  if (!(await isSharingEnabled())) return;
 
   try {
     await syncStatusForLocation({

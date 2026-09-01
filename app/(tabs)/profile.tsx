@@ -24,6 +24,7 @@ import {
   signedAvatarUrl,
   signedDrinkUrls,
 } from '../../lib/photos';
+import { isSharingEnabled, setSharingEnabled } from '../../lib/sharing';
 import { clearStatus, syncStatusForLocation } from '../../lib/statusSync';
 import { colors, spacing } from '../../lib/theme';
 import type { Bar, DrinkPost, Profile } from '../../lib/types';
@@ -35,6 +36,7 @@ export default function ProfileScreen() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [bar, setBar] = useState<Bar | null>(null);
   const [permission, setPermission] = useState<PermissionLevel>('denied');
+  const [sharing, setSharing] = useState(true);
   const [posts, setPosts] = useState<DrinkPost[]>([]);
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -45,15 +47,17 @@ export default function ProfileScreen() {
   const load = useCallback(async () => {
     if (!userId) return;
     try {
-      const [me, status, level, drinks] = await Promise.all([
+      const [me, status, level, enabled, drinks] = await Promise.all([
         fetchMyProfile(userId),
         fetchMyStatus(userId),
         getPermissionLevel(),
+        isSharingEnabled(),
         fetchDrinkPosts(userId),
       ]);
       setProfile(me);
       setBar(status.bar);
       setPermission(level);
+      setSharing(enabled);
       setPosts(drinks);
       const [avatar, urls] = await Promise.all([
         signedAvatarUrl(me.avatar_url),
@@ -85,6 +89,9 @@ export default function ProfileScreen() {
         return;
       }
 
+      await setSharingEnabled(true);
+      setSharing(true);
+
       if (level === 'background') await startBackgroundUpdates();
 
       const point = await getCurrentPoint();
@@ -101,6 +108,8 @@ export default function ProfileScreen() {
     setBusy(true);
     setError(null);
     try {
+      await setSharingEnabled(false);
+      setSharing(false);
       await stopBackgroundUpdates();
       await clearStatus();
       setBar(null);
@@ -187,11 +196,13 @@ export default function ProfileScreen() {
       <View style={styles.card}>
         <Text style={styles.label}>Location sharing</Text>
         <Text style={styles.muted}>
-          {permission === 'background'
-            ? 'On, including in the background.'
-            : permission === 'foreground'
-              ? 'On while the app is open. Allow "Always" to update in the background.'
-              : 'Off. Friends cannot see when you are out.'}
+          {permission === 'denied'
+            ? 'Off. Friends cannot see when you are out.'
+            : !sharing
+              ? 'Offline. Your location is not being read at all.'
+              : permission === 'background'
+                ? 'On, including in the background.'
+                : 'On while the app is open. Allow "Always" to update in the background.'}
         </Text>
         <Text style={styles.fineprint}>
           Your coordinates stay on your phone. Only the bar you are at is stored, and only friends
@@ -202,8 +213,18 @@ export default function ProfileScreen() {
             title={permission === 'denied' ? 'Enable sharing' : 'Check in now'}
             onPress={permission === 'denied' ? enableSharing : refreshStatus}
             loading={busy}
+            disabled={permission !== 'denied' && !sharing}
           />
-          <Button title="Go offline" variant="secondary" onPress={goOffline} disabled={busy} />
+          {sharing ? (
+            <Button title="Go offline" variant="secondary" onPress={goOffline} disabled={busy} />
+          ) : (
+            <Button
+              title="Go online"
+              variant="secondary"
+              onPress={enableSharing}
+              disabled={busy}
+            />
+          )}
         </View>
       </View>
 

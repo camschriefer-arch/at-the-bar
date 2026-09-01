@@ -94,6 +94,8 @@ Profile pictures live in the `avatars` bucket and drink photos in `drinks`, both
 
 `drink_posts` keeps a snapshot of the bar name alongside the optional `bar_id`, because the catalog is reimported from OpenStreetMap and a bar can vanish from it while the photo should not. Ratings are constrained to 1–5 in the database.
 
+The bar field autocompletes against the catalog: bars from the cached tile around the device rank first (closest first, with the distance shown), then name matches from anywhere in the country, and a name that has no catalog entry can still be typed in freely. Only the typed text is sent for the country-wide search — the device's position never leaves it.
+
 The buckets and their policies are created by `supabase/migrations/20260830000004_photos.sql`, which skips the storage half when the `storage` schema is absent so the migration still applies to a plain Postgres in tests.
 
 ## Removing a friend

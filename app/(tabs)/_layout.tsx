@@ -1,9 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Tabs } from 'expo-router';
+import type { ColorValue } from 'react-native';
 
 import { colors } from '../../lib/theme';
 
-type TabIconProps = { color: string; focused: boolean; size: number };
+type TabIconProps = { color: ColorValue; focused: boolean; size: number };
 
 // Filled while the tab is open, outlined otherwise.
 function FriendsIcon({ color, focused, size }: TabIconProps) {

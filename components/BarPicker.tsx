@@ -84,7 +84,10 @@ export function BarPicker({ nearby, origin, bar, name, onChange }: BarPickerProp
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Choose a different bar"
-          onPress={() => onChange({ bar: null, name: '' })}>
+          onPress={() => {
+            setDismissed(false);
+            onChange({ bar: null, name: '' });
+          }}>
           <Text style={styles.change}>Change bar</Text>
         </Pressable>
       ) : null}

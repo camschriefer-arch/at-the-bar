@@ -50,6 +50,25 @@ export async function barsNear(point: LatLng): Promise<Bar[]> {
   return bars;
 }
 
+/**
+ * Catalog-wide name search, for bars outside the cached tile. Only the typed
+ * text is sent; the device's position stays local.
+ */
+export async function searchBarsByName(query: string, limit = 10): Promise<Bar[]> {
+  const term = query.trim();
+  if (term.length < 2) return [];
+
+  const { data, error } = await supabase
+    .from('bars')
+    .select('id, name, street, city, state, lat, lng')
+    .ilike('name', `%${term.replace(/[%_]/g, '\\$&')}%`)
+    .order('name')
+    .limit(limit);
+
+  if (error) throw error;
+  return (data ?? []) as Bar[];
+}
+
 export async function clearBarCache(): Promise<void> {
   const keys = await AsyncStorage.getAllKeys();
   const ours = keys.filter((key) => key.startsWith(CACHE_PREFIX));

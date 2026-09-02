@@ -1,11 +1,18 @@
-export const AT_BAR_RADIUS_MILES = 0.1;
+export const AT_BAR_RADIUS_MILES = 0.05;
 export const AT_BAR_RADIUS_METERS = AT_BAR_RADIUS_MILES * 1609.344;
 
 /**
  * Size of the coarse tile the client asks the server for. The device never
  * sends its precise position: it rounds down to a tile and filters locally.
  */
-export const TILE_DEGREES = 0.05;
+export const TILE_DEGREES = 0.02;
+
+/**
+ * How far outside its tile a request reaches, so a device at a tile edge still
+ * sees venues just over the boundary. ~550 m covers the check-in radius several
+ * times over without pulling in a city's worth of restaurants.
+ */
+export const TILE_PADDING_DEGREES = 0.005;
 
 const EARTH_RADIUS_METERS = 6371008.8;
 
@@ -39,19 +46,16 @@ export function tileKey(point: LatLng): string {
   return `${lat}:${lng}`;
 }
 
-/**
- * The tile containing `point`, padded by one tile on each side so a device near
- * a tile edge still sees bars on the other side of the boundary.
- */
+/** The tile containing `point`, padded on each side. */
 export function tileBoundingBox(point: LatLng): BoundingBox {
   const lat = Math.floor(point.lat / TILE_DEGREES) * TILE_DEGREES;
   const lng = Math.floor(point.lng / TILE_DEGREES) * TILE_DEGREES;
 
   return {
-    minLat: lat - TILE_DEGREES,
-    minLng: lng - TILE_DEGREES,
-    maxLat: lat + 2 * TILE_DEGREES,
-    maxLng: lng + 2 * TILE_DEGREES,
+    minLat: lat - TILE_PADDING_DEGREES,
+    minLng: lng - TILE_PADDING_DEGREES,
+    maxLat: lat + TILE_DEGREES + TILE_PADDING_DEGREES,
+    maxLng: lng + TILE_DEGREES + TILE_PADDING_DEGREES,
   };
 }
 

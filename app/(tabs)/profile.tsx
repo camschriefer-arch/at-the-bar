@@ -25,9 +25,10 @@ import {
   signedDrinkUrls,
 } from '../../lib/photos';
 import { isSharingEnabled, setSharingEnabled } from '../../lib/sharing';
-import { clearStatus, syncStatusForLocation } from '../../lib/statusSync';
+import { checkInAt, clearStatus, syncStatusForLocation } from '../../lib/statusSync';
 import { colors, spacing } from '../../lib/theme';
 import type { Bar, DrinkPost, Profile } from '../../lib/types';
+import { clearPendingVenue, getPendingVenue, type PendingVenue } from '../../lib/venuePrompt';
 
 export default function ProfileScreen() {
   const { session, signOut } = useAuth();
@@ -37,6 +38,7 @@ export default function ProfileScreen() {
   const [bar, setBar] = useState<Bar | null>(null);
   const [permission, setPermission] = useState<PermissionLevel>('denied');
   const [sharing, setSharing] = useState(true);
+  const [pending, setPending] = useState<PendingVenue | null>(null);
   const [posts, setPosts] = useState<DrinkPost[]>([]);
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -47,18 +49,20 @@ export default function ProfileScreen() {
   const load = useCallback(async () => {
     if (!userId) return;
     try {
-      const [me, status, level, enabled, drinks] = await Promise.all([
+      const [me, status, level, enabled, drinks, prompt] = await Promise.all([
         fetchMyProfile(userId),
         fetchMyStatus(userId),
         getPermissionLevel(),
         isSharingEnabled(),
         fetchDrinkPosts(userId),
+        getPendingVenue(),
       ]);
       setProfile(me);
       setBar(status.bar);
       setPermission(level);
       setSharing(enabled);
       setPosts(drinks);
+      setPending(status.bar ? null : prompt);
       const [avatar, urls] = await Promise.all([
         signedAvatarUrl(me.avatar_url),
         signedDrinkUrls(drinks),
@@ -118,6 +122,25 @@ export default function ProfileScreen() {
     } finally {
       setBusy(false);
     }
+  };
+
+  const confirmPending = async (barId: string) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await checkInAt(barId);
+      setPending(null);
+      await load();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not check you in');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const dismissPending = async () => {
+    setPending(null);
+    await clearPendingVenue();
   };
 
   const changeAvatar = async () => {
@@ -192,6 +215,29 @@ export default function ProfileScreen() {
           <Text style={styles.muted}>Not at a bar. Friends see nothing.</Text>
         )}
       </View>
+
+      {pending && sharing ? (
+        <View style={styles.card}>
+          <Text style={styles.label}>Are you here?</Text>
+          <Text style={styles.barName}>{pending.barName}</Text>
+          <Text style={styles.muted}>
+            It is a restaurant, so we only share it if you say you are there.
+          </Text>
+          <View style={styles.actions}>
+            <Button
+              title="Yes, I'm here"
+              onPress={() => void confirmPending(pending.barId)}
+              loading={busy}
+            />
+            <Button
+              title="Not here"
+              variant="secondary"
+              onPress={() => void dismissPending()}
+              disabled={busy}
+            />
+          </View>
+        </View>
+      ) : null}
 
       <View style={styles.card}>
         <Text style={styles.label}>Location sharing</Text>

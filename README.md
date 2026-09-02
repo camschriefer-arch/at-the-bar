@@ -3,7 +3,8 @@
 iOS + Android app that shows which of your friends are out at a bar right now, and nothing else about where they are.
 
 - Sign up with email, add friends by email invite, accept requests.
-- The phone checks whether you are within **0.1 miles** of a bar. If you are, your status becomes _At the bar_ with the bar's name.
+- The phone checks whether you are within **0.05 miles** of a bar. If you are, your status becomes _At the bar_ with the bar's name.
+- Restaurants are in the catalog too, but never check you in on their own: get near one and the app asks "Are you at Jake & Joe's?", and only a yes sets your status.
 - Friends who accepted your request see that status and, on your profile, a map pin on the bar.
 - Friends get a push notification when you arrive at or leave a bar ("Bob is at the bar"), naming you but not the bar.
 - Removing a friend cuts the tie both ways; they get an email about it, never a push.
@@ -12,7 +13,7 @@ iOS + Android app that shows which of your friends are out at a bar right now, a
 
 ## Privacy model
 
-Your coordinates never leave your device. The app downloads the bars for a coarse ~3 mile tile around you, measures distances locally, and writes only a bar id to the server (`set_current_bar`). The database has no column anywhere that can hold a user's raw position.
+Your coordinates never leave your device. The app downloads the venues for a coarse ~1.5 mile tile around you, measures distances locally, and writes only a bar id to the server (`set_current_bar`). The database has no column anywhere that can hold a user's raw position.
 
 `user_status` rows are readable by the owner and, only when `bar_id is not null`, by accepted friends. Leaving a bar deletes the association rather than recording a departure location.
 
@@ -24,7 +25,7 @@ Your coordinates never leave your device. The app downloads the bars for a coars
 | Location | `expo-location` foreground + background updates, `expo-task-manager` |
 | Maps | `react-native-maps` with Google Maps on both platforms |
 | Backend | Supabase: Postgres + PostGIS, auth, row level security |
-| Bar catalog | OpenStreetMap `amenity=bar|pub`, imported per state |
+| Venue catalog | OpenStreetMap `amenity=bar|pub|restaurant`, imported per state |
 | Push | `expo-notifications` + Expo Push Service, fanned out by the `send-push` edge function |
 | Photos | `expo-image-picker` + private Supabase Storage buckets, rendered from signed URLs with `expo-image` |
 
@@ -46,12 +47,15 @@ Your coordinates never leave your device. The app downloads the bars for a coars
    npm install
    ```
 
-3. Load the bar catalog (Overpass is rate limited, so start with a couple of states):
+3. Load the venue catalog (Overpass is rate limited, so start with a couple of states):
 
    ```sh
    SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... npm run import-bars -- --states TX,NY
    SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... npm run import-bars   # all 50 states + DC
+   SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... npm run import-bars -- --categories restaurant
    ```
+
+   The import is idempotent (keyed on the OSM id), so re-running it only refreshes rows.
 
 4. Run it. Background location needs a development build, not Expo Go:
 

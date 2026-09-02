@@ -7,9 +7,11 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AuthProvider, useAuth } from '../lib/AuthProvider';
 import { registerForPushNotifications } from '../lib/notifications';
+import { checkInAt } from '../lib/statusSync';
 import { colors } from '../lib/theme';
+import { clearPendingVenue, VENUE_PROMPT_CONFIRM, VENUE_PROMPT_DISMISS } from '../lib/venuePrompt';
 
-type BarEventPayload = { friendId?: string };
+type BarEventPayload = { friendId?: string; kind?: string; barId?: string };
 
 function RootNavigator() {
   const { session, loading } = useAuth();
@@ -39,8 +41,26 @@ function RootNavigator() {
   useEffect(() => {
     if (!session || !tapped) return;
 
-    const { friendId } = tapped.notification.request.content.data as BarEventPayload;
-    if (friendId) router.push(`/friend/${friendId}`);
+    const { friendId, kind, barId } = tapped.notification.request.content.data as BarEventPayload;
+    if (friendId) {
+      router.push(`/friend/${friendId}`);
+      return;
+    }
+
+    if (kind !== 'venue-confirm' || !barId) return;
+
+    // The response outlives its handling, so it is cleared to keep a relaunch
+    // from checking the user in at a restaurant they left hours ago.
+    void Notifications.clearLastNotificationResponseAsync();
+
+    if (tapped.actionIdentifier === VENUE_PROMPT_DISMISS) {
+      void clearPendingVenue();
+    } else if (tapped.actionIdentifier === VENUE_PROMPT_CONFIRM) {
+      void checkInAt(barId);
+    } else {
+      // Tapping the notification itself opens the screen that asks again.
+      router.push('/(tabs)/profile');
+    }
   }, [session, tapped, router]);
 
   if (loading) {

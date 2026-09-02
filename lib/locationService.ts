@@ -26,7 +26,9 @@ export async function startBackgroundUpdates(): Promise<void> {
   if (await Location.hasStartedLocationUpdatesAsync(BACKGROUND_LOCATION_TASK)) return;
 
   await Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK, {
-    accuracy: Location.Accuracy.Balanced,
+    // Balanced is only accurate to ~100 m, which is wider than the 0.05 mi
+    // check-in radius, so a fix has to be good enough to place a building.
+    accuracy: Location.Accuracy.High,
     distanceInterval: AT_BAR_RADIUS_METERS / 2,
     timeInterval: Platform.OS === 'android' ? 60_000 : undefined,
     pausesUpdatesAutomatically: true,
@@ -46,7 +48,7 @@ export async function stopBackgroundUpdates(): Promise<void> {
 
 export async function getCurrentPoint(): Promise<{ lat: number; lng: number }> {
   const position = await Location.getCurrentPositionAsync({
-    accuracy: Location.Accuracy.Balanced,
+    accuracy: Location.Accuracy.High,
   });
 
   return { lat: position.coords.latitude, lng: position.coords.longitude };

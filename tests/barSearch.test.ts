@@ -12,6 +12,7 @@ const bar = (id: string, name: string): Bar => ({
   state: 'NY',
   lat: 40.734,
   lng: -73.9857,
+  category: 'bar',
 });
 
 const near = (id: string, name: string, meters: number): BarSuggestion => ({

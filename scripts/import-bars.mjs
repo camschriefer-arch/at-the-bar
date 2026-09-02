@@ -9,6 +9,7 @@
  * Usage:
  *   SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... npm run import-bars
  *   npm run import-bars -- --states CA,NY   # subset, useful for a first run
+ *   npm run import-bars -- --categories restaurant   # top up one category
  */
 import { createClient } from '@supabase/supabase-js';
 
@@ -34,10 +35,14 @@ const STATES = {
   WA: 'Washington', WV: 'West Virginia', WI: 'Wisconsin', WY: 'Wyoming',
 };
 
+// Bars and pubs check a user in on their own; restaurants only do so after the
+// user confirms a prompt, because plenty of them are places nobody drinks at.
+const CATEGORIES = ['bar', 'pub', 'restaurant'];
+
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function parseArgs(argv) {
-  const args = { states: Object.keys(STATES) };
+  const args = { states: Object.keys(STATES), categories: CATEGORIES };
 
   for (let i = 0; i < argv.length; i += 1) {
     if (argv[i] === '--states') {
@@ -46,10 +51,22 @@ function parseArgs(argv) {
       args.states = value.split(',').map((code) => code.trim().toUpperCase());
       i += 1;
     }
+
+    if (argv[i] === '--categories') {
+      const value = argv[i + 1];
+      if (!value) throw new Error('--categories needs a comma separated list, e.g. --categories bar,pub');
+      args.categories = value.split(',').map((name) => name.trim().toLowerCase());
+      i += 1;
+    }
   }
 
   const unknown = args.states.filter((code) => !(code in STATES));
   if (unknown.length > 0) throw new Error(`Unknown state codes: ${unknown.join(', ')}`);
+
+  const unknownCategories = args.categories.filter((name) => !CATEGORIES.includes(name));
+  if (unknownCategories.length > 0) {
+    throw new Error(`Unknown categories: ${unknownCategories.join(', ')}`);
+  }
 
   return args;
 }
@@ -57,20 +74,22 @@ function parseArgs(argv) {
 // Selected by ISO code rather than name: US state relations no longer carry
 // `is_in:country_code`, and matching on the name alone would also pick up
 // same-named areas elsewhere in the world.
-function overpassQuery(stateCode) {
+function overpassQuery(stateCode, categories) {
+  const amenity = `^(${categories.join('|')})$`;
+
   return `
     [out:json][timeout:600];
     area["ISO3166-2"="US-${stateCode}"]["admin_level"="4"]->.state;
     (
-      node["amenity"~"^(bar|pub)$"](area.state);
-      way["amenity"~"^(bar|pub)$"](area.state);
-      relation["amenity"~"^(bar|pub)$"](area.state);
+      node["amenity"~"${amenity}"](area.state);
+      way["amenity"~"${amenity}"](area.state);
+      relation["amenity"~"${amenity}"](area.state);
     );
     out center tags;
   `;
 }
 
-async function fetchState(stateCode, stateName) {
+async function fetchState(stateCode, stateName, categories) {
   for (let attempt = 0; ; attempt += 1) {
     const response = await fetch(OVERPASS_URL, {
       method: 'POST',
@@ -78,7 +97,7 @@ async function fetchState(stateCode, stateName) {
         'Content-Type': 'application/x-www-form-urlencoded',
         'User-Agent': USER_AGENT,
       },
-      body: new URLSearchParams({ data: overpassQuery(stateCode) }),
+      body: new URLSearchParams({ data: overpassQuery(stateCode, categories) }),
     });
 
     if (response.ok) return response.json();
@@ -93,12 +112,15 @@ async function fetchState(stateCode, stateName) {
   }
 }
 
-function toBarRows(elements, stateCode) {
+function toBarRows(elements, stateCode, categories) {
   const rows = [];
 
   for (const element of elements) {
     const name = element.tags?.name?.trim();
     if (!name) continue;
+
+    const category = element.tags.amenity;
+    if (!categories.includes(category)) continue;
 
     const lat = element.lat ?? element.center?.lat;
     const lng = element.lon ?? element.center?.lon;
@@ -115,6 +137,7 @@ function toBarRows(elements, stateCode) {
       city: element.tags['addr:city'] ?? null,
       state: element.tags['addr:state'] ?? stateCode,
       postcode: element.tags['addr:postcode'] ?? null,
+      category,
       lat,
       lng,
       location: `SRID=4326;POINT(${lng} ${lat})`,
@@ -126,7 +149,7 @@ function toBarRows(elements, stateCode) {
 }
 
 async function main() {
-  const { states } = parseArgs(process.argv.slice(2));
+  const { states, categories } = parseArgs(process.argv.slice(2));
 
   const url = process.env.SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -143,13 +166,13 @@ async function main() {
     const stateName = STATES[code];
     process.stdout.write(`${code} …`);
 
-    const payload = await fetchState(code, stateName);
-    const rows = toBarRows(payload.elements ?? [], code);
+    const payload = await fetchState(code, stateName, categories);
+    const rows = toBarRows(payload.elements ?? [], code, categories);
 
     // A state that returns nothing means the area lookup missed, not that the
     // state has no bars — fail loudly instead of importing a silent gap.
     if (rows.length === 0) {
-      throw new Error(`No bars found for ${stateName}; the Overpass area lookup likely failed.`);
+      throw new Error(`No venues found for ${stateName}; the Overpass area lookup likely failed.`);
     }
 
     for (let i = 0; i < rows.length; i += BATCH_SIZE) {
@@ -162,13 +185,13 @@ async function main() {
     }
 
     total += rows.length;
-    console.log(` ${rows.length} bars`);
+    console.log(` ${rows.length} venues`);
 
     // Overpass asks clients to stay under roughly one query at a time.
     await sleep(5_000);
   }
 
-  console.log(`Imported ${total} bars across ${states.length} states.`);
+  console.log(`Imported ${total} venues across ${states.length} states.`);
 }
 
 main().catch((error) => {

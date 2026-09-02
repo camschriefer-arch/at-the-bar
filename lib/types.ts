@@ -1,3 +1,10 @@
+/**
+ * Bars and pubs set a status on their own. Restaurants are in the catalog
+ * because a lot of them are where people actually drink, but they only set a
+ * status once the user answers the "are you here?" prompt.
+ */
+export type VenueCategory = 'bar' | 'pub' | 'restaurant';
+
 export type Bar = {
   id: string;
   name: string;
@@ -6,6 +13,7 @@ export type Bar = {
   state: string | null;
   lat: number;
   lng: number;
+  category: VenueCategory;
 };
 
 export type Profile = {

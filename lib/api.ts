@@ -61,7 +61,7 @@ export async function fetchMyProfile(userId: string): Promise<Profile> {
 export async function fetchMyStatus(userId: string): Promise<{ status: UserStatus; bar: Bar | null }> {
   const { data, error } = await supabase
     .from('user_status')
-    .select('user_id, bar_id, arrived_at, updated_at, bar:bars(id, name, street, city, state, lat, lng)')
+    .select('user_id, bar_id, arrived_at, updated_at, bar:bars(id, name, street, city, state, lat, lng, category)')
     .eq('user_id', userId)
     .single();
 

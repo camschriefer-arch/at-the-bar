@@ -1,5 +1,13 @@
 import { supabase } from './supabase';
-import type { Bar, FriendFeedRow, FriendRequest, InviteResult, Profile, UserStatus } from './types';
+import type {
+  Bar,
+  FriendFeedRow,
+  FriendRequest,
+  InviteLink,
+  InviteResult,
+  Profile,
+  UserStatus,
+} from './types';
 
 export async function fetchFriendFeed(): Promise<FriendFeedRow[]> {
   const { data, error } = await supabase.rpc('friend_feed');
@@ -40,6 +48,12 @@ export async function inviteByEmail(email: string): Promise<InviteResult> {
   const { data, error } = await supabase.rpc('invite_by_email', { p_email: email });
   if (error) throw error;
   return data as InviteResult;
+}
+
+export async function createInviteLink(): Promise<InviteLink> {
+  const { data, error } = await supabase.rpc('create_invite_link');
+  if (error) throw error;
+  return data as InviteLink;
 }
 
 export async function acceptInvite(token: string): Promise<void> {

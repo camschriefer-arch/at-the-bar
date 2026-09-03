@@ -137,6 +137,29 @@ To test friend-detail UI, re-set the other user's status with service-role SQL:
 `update user_status set bar_id=(select id from bars limit 1), arrived_at=now() where user_id='<uuid>';`
 (note this fires the notification trigger and enqueues an outbox row).
 
+## Schema changes, rebuilds and clipboard/long-text input
+
+- A branch that adds a migration does NOT need `supabase db reset` (which would wipe the bars
+  catalog and the test accounts): `npx supabase migration up --local` applies only the pending
+  files to the running stack and leaves data intact. Verify afterwards with `\d <table>` and
+  `select proacl from pg_proc where proname='<new_rpc>'`.
+- Gradle needs the SDK location explicitly when invoked outside Expo: export
+  `ANDROID_HOME=$HOME/Android/Sdk` (there is no `android/local.properties`), otherwise the build
+  fails with "SDK location not found". A warm incremental `:app:assembleDebug` takes ~1-2 min.
+- Any newly added native/Expo module (e.g. `expo-clipboard`) needs a rebuild + `adb install -r -t`;
+  autolinking picks it up at Gradle configure time, no re-`prebuild` needed.
+- `adb shell input text` silently truncates long strings (~50-60 chars): type long tokens/URLs in
+  chunks with a short sleep between them and re-dump the field to confirm the full value.
+- To verify what an app put on the clipboard, focus a text field and send `keyevent 279`
+  (KEYCODE_PASTE), then read the EditText `text=` from `uiautomator dump`. `cmd clipboard get`
+  does not exist on this image.
+- On the Invite screen the notice/error line renders at the very BOTTOM of the ScrollView, so
+  after tapping a button near the top you must scroll down to see (and screenshot) the feedback.
+- Supabase PostgrestError objects are not `instanceof Error`, so screens using
+  `cause instanceof Error ? cause.message : '<generic>'` will show only the generic fallback and
+  hide RPC `raise exception` messages. Confirm the real message by calling the RPC over PostgREST
+  with the user's own JWT before reporting the UI text as the backend behaviour.
+
 ## Test-account and evidence gotchas
 
 - Passwords for previously created local accounts are easy to lose; reset with the admin API:

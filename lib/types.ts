@@ -74,3 +74,5 @@ export type UserStatus = {
 export type InviteResult =
   | { kind: 'invite'; token: string; email: string }
   | { kind: 'friendship'; status: FriendRequest['status']; friendship_id: string };
+
+export type InviteLink = { token: string; expires_at: string };

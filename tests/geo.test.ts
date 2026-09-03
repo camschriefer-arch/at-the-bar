@@ -12,8 +12,8 @@ import { LEAVE_RADIUS_METERS } from '../lib/venues.ts';
 
 const mollys = { lat: 40.734, lng: -73.9857 };
 
-test('0.05 miles is about 80 meters', () => {
-  assert.ok(Math.abs(AT_BAR_RADIUS_METERS - 80.4672) < 0.001);
+test('0.03 miles is about 48 meters', () => {
+  assert.ok(Math.abs(AT_BAR_RADIUS_METERS - 48.28032) < 0.001);
 });
 
 test('distance between a point and itself is zero', () => {
@@ -43,7 +43,7 @@ test('nearestWithin returns null when every bar is beyond the radius', () => {
 });
 
 test('a wider radius keeps a bar that just went out of range', () => {
-  const justOutside = { id: 'edge', lat: mollys.lat + 0.0008, lng: mollys.lng };
+  const justOutside = { id: 'edge', lat: mollys.lat + 0.0005, lng: mollys.lng };
 
   assert.equal(nearestWithin(mollys, [justOutside]), null);
   assert.equal(nearestWithin(mollys, [justOutside], AT_BAR_RADIUS_METERS * 1.5)?.item.id, 'edge');

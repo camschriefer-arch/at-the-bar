@@ -1,4 +1,4 @@
-export const AT_BAR_RADIUS_MILES = 0.05;
+export const AT_BAR_RADIUS_MILES = 0.03;
 export const AT_BAR_RADIUS_METERS = AT_BAR_RADIUS_MILES * 1609.344;
 
 /**

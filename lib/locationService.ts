@@ -26,10 +26,11 @@ export async function startBackgroundUpdates(): Promise<void> {
   if (await Location.hasStartedLocationUpdatesAsync(BACKGROUND_LOCATION_TASK)) return;
 
   await Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK, {
-    // Balanced is only accurate to ~100 m, which is wider than the 0.05 mi
-    // check-in radius, so a fix has to be good enough to place a building.
+    // Balanced is only accurate to ~100 m, which is wider than the check-in
+    // radius, so a fix has to be good enough to place a building.
     accuracy: Location.Accuracy.High,
-    distanceInterval: AT_BAR_RADIUS_METERS / 2,
+    // Half the radius, but never so short that the phone is woken constantly.
+    distanceInterval: Math.max(AT_BAR_RADIUS_METERS / 2, 25),
     timeInterval: Platform.OS === 'android' ? 60_000 : undefined,
     pausesUpdatesAutomatically: true,
     showsBackgroundLocationIndicator: false,

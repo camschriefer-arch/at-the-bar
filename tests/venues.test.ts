@@ -36,7 +36,7 @@ test('no venue checks a user in on its own', () => {
 });
 
 test('every venue in range is asked about, of any category, nearest first', () => {
-  const venues = [venue('far', 'bar', 60), venue('jakes', 'restaurant', 10)];
+  const venues = [venue('far', 'bar', 40), venue('jakes', 'restaurant', 10)];
 
   assert.deepEqual(
     venuesToConfirm(here, venues).map((v) => v.id),
@@ -65,9 +65,9 @@ test('the dwell clock ignores which of the nearby venues is closest', () => {
 });
 
 test('a confirmed venue stays the status while the user is near it', () => {
-  const venues = [venue('jakes', 'restaurant', 100), venue('pub', 'bar', 10)];
+  const venues = [venue('jakes', 'restaurant', 60), venue('pub', 'bar', 10)];
 
-  // 100 m is past the check-in radius but inside the leave radius, and a
+  // 60 m is past the check-in radius but inside the leave radius, and a
   // closer bar does not take over a confirmed status.
   assert.equal(stillAt(here, venues, 'jakes')?.id, 'jakes');
 });

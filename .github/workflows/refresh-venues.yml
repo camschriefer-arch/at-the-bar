@@ -1,0 +1,58 @@
+name: Refresh venue catalog
+
+# OpenStreetMap gains and loses venues constantly, so the catalog is re-imported
+# monthly. The import is keyed on the OSM id, so a run only refreshes rows.
+on:
+  schedule:
+    # 04:00 UTC on the 1st of each month, i.e. the middle of the night in the US.
+    - cron: '0 4 1 * *'
+  workflow_dispatch:
+    inputs:
+      states:
+        description: 'Comma separated states to refresh (default: all)'
+        required: false
+        type: string
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      chunks: ${{ steps.chunks.outputs.chunks }}
+    steps:
+      # A whole-country run is hours of Overpass throttling, so it is split into
+      # chunks of states. A manual run with an explicit list is a single chunk.
+      - id: chunks
+        env:
+          STATES: ${{ inputs.states }}
+        run: |
+          if [ -n "$STATES" ]; then
+            echo "chunks=[\"$STATES\"]" >> "$GITHUB_OUTPUT"
+          else
+            echo 'chunks=["AL,AK,AZ,AR,CA,CO,CT,DE,DC","FL,GA,HI,ID,IL,IN,IA,KS,KY","LA,ME,MD,MA,MI,MN,MS,MO,MT","NE,NV,NH,NJ,NM,NY,NC,ND,OH","OK,OR,PA,RI,SC,SD,TN,TX,UT","VT,VA,WA,WV,WI,WY"]' >> "$GITHUB_OUTPUT"
+          fi
+
+  import:
+    needs: plan
+    runs-on: ubuntu-latest
+    strategy:
+      # Overpass hands out very few query slots, hence the low parallelism.
+      max-parallel: 2
+      fail-fast: false
+      matrix:
+        states: ${{ fromJSON(needs.plan.outputs.chunks) }}
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Import venues
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: npm run import-bars -- --states "${{ matrix.states }}"

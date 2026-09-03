@@ -7,23 +7,20 @@ import type { Bar } from './types';
  */
 export const LEAVE_RADIUS_METERS = AT_BAR_RADIUS_METERS * 1.5;
 
-/** Restaurants take a confirmed prompt; bars and pubs do not. */
-export const checksInAutomatically = (venue: Bar) => venue.category !== 'restaurant';
-
 /**
- * The venue the user counts as being at: the one they are already checked in to
- * while they stay near it, otherwise the nearest bar or pub.
+ * The venue the user is already checked in to, while they stay near it. No
+ * venue ever checks a user in on its own — an office over a pub would put you
+ * at the bar all day — so this only keeps a confirmed status alive.
  */
-export function resolveVenueAt(
+export function stillAt(
   point: LatLng,
   venues: readonly Bar[],
   currentBarId: string | null
 ): Bar | null {
-  const current = currentBarId ? venues.find((venue) => venue.id === currentBarId) : undefined;
+  const current = currentBarId ? venues.find((venue) => venue.id === currentBarId) : null;
+  if (!current) return null;
 
-  if (current && nearestWithin(point, [current], LEAVE_RADIUS_METERS)) return current;
-
-  return nearestWithin(point, venues.filter(checksInAutomatically))?.item ?? null;
+  return nearestWithin(point, [current], LEAVE_RADIUS_METERS) ? current : null;
 }
 
 /**
@@ -51,8 +48,7 @@ export function noteSighting(
   return { sighting: previous, dwelled: now - previous.since >= DWELL_MS };
 }
 
-/** The restaurant close enough to be worth asking the user about, if any. */
-export function restaurantToConfirm(point: LatLng, venues: readonly Bar[]): Bar | null {
-  const candidates = venues.filter((venue) => !checksInAutomatically(venue));
-  return nearestWithin(point, candidates)?.item ?? null;
+/** The venue close enough to be worth asking the user about, if any. */
+export function venueToConfirm(point: LatLng, venues: readonly Bar[]): Bar | null {
+  return nearestWithin(point, venues)?.item ?? null;
 }

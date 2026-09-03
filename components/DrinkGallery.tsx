@@ -1,10 +1,19 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Stars } from './Stars';
 import { colors, spacing } from '../lib/theme';
 import type { DrinkPost } from '../lib/types';
+
+const postedOn = (iso: string) =>
+  new Date(iso).toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
 
 type DrinkGalleryProps = {
   posts: DrinkPost[];
@@ -17,6 +26,7 @@ type DrinkGalleryProps = {
 export function DrinkGallery({ posts, urls, emptyLabel, onDelete }: DrinkGalleryProps) {
   const [openId, setOpenId] = useState<string | null>(null);
   const open = posts.find((post) => post.id === openId) ?? null;
+  const insets = useSafeAreaInsets();
 
   if (posts.length === 0) {
     return <Text style={styles.muted}>{emptyLabel}</Text>;
@@ -52,9 +62,12 @@ export function DrinkGallery({ posts, urls, emptyLabel, onDelete }: DrinkGallery
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Close photo"
-              style={styles.close}
+              // A modal draws under the status bar and the notch, so the button
+              // sits below whatever the phone puts up there.
+              style={[styles.close, { marginTop: insets.top + spacing.sm }]}
+              hitSlop={spacing.md}
               onPress={() => setOpenId(null)}>
-              <Text style={styles.closeLabel}>Close</Text>
+              <Ionicons name="close" size={26} color={colors.text} />
             </Pressable>
 
             <Image source={urls[open.image_path]} style={styles.full} contentFit="contain" />
@@ -62,6 +75,7 @@ export function DrinkGallery({ posts, urls, emptyLabel, onDelete }: DrinkGallery
             <ScrollView style={styles.details} contentContainerStyle={styles.detailsContent}>
               <Text style={styles.beerName}>{open.beer_name}</Text>
               <Text style={styles.barName}>{open.bar_name}</Text>
+              <Text style={styles.postedOn}>{postedOn(open.created_at)}</Text>
               <Stars rating={open.rating} size={22} />
               {open.description ? (
                 <Text style={styles.description}>{open.description}</Text>
@@ -105,13 +119,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   close: {
+    alignItems: 'center',
     alignSelf: 'flex-end',
-    padding: spacing.md,
-  },
-  closeLabel: {
-    color: colors.text,
-    fontSize: 16,
-    fontWeight: '600',
+    backgroundColor: '#00000099',
+    borderRadius: 22,
+    height: 44,
+    justifyContent: 'center',
+    marginRight: spacing.md,
+    width: 44,
   },
   full: {
     flex: 1,
@@ -134,6 +149,10 @@ const styles = StyleSheet.create({
     color: colors.accent,
     fontSize: 16,
     fontWeight: '600',
+  },
+  postedOn: {
+    color: colors.muted,
+    fontSize: 14,
   },
   description: {
     color: colors.muted,

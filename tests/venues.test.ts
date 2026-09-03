@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import type { Bar, VenueCategory } from '../lib/types.ts';
-import { resolveVenueAt, restaurantToConfirm } from '../lib/venues.ts';
+import { DWELL_MS, noteSighting, resolveVenueAt, restaurantToConfirm } from '../lib/venues.ts';
 
 const here = { lat: 42.3798562, lng: -71.2629227 };
 
@@ -55,4 +55,32 @@ test('a nearby bar is not asked about', () => {
 
 test('only a restaurant within the check-in radius is asked about', () => {
   assert.equal(restaurantToConfirm(here, [venue('jakes', 'restaurant', 300)]), null);
+});
+
+test('a first sighting starts the clock and counts for nothing', () => {
+  const { sighting, dwelled } = noteSighting(null, 'jakes', 1_000);
+
+  assert.equal(dwelled, false);
+  assert.deepEqual(sighting, { barId: 'jakes', since: 1_000 });
+});
+
+test('walking past for less than the dwell never counts', () => {
+  const first = noteSighting(null, 'jakes', 0).sighting;
+
+  assert.equal(noteSighting(first, 'jakes', DWELL_MS - 1).dwelled, false);
+  assert.equal(noteSighting(first, 'jakes', DWELL_MS).dwelled, true);
+});
+
+test('moving to another venue restarts the clock', () => {
+  const first = noteSighting(null, 'jakes', 0).sighting;
+  const second = noteSighting(first, 'pub', DWELL_MS).sighting;
+
+  assert.deepEqual(second, { barId: 'pub', since: DWELL_MS });
+  assert.equal(noteSighting(second, 'pub', DWELL_MS + 1).dwelled, false);
+});
+
+test('a clock from the future is restarted rather than trusted', () => {
+  const skewed = { barId: 'jakes', since: 10_000 };
+
+  assert.deepEqual(noteSighting(skewed, 'jakes', 1_000).sighting, { barId: 'jakes', since: 1_000 });
 });

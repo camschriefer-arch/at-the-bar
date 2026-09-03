@@ -6,8 +6,13 @@ import { ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { Button } from '../../components/Button';
 import { Field } from '../../components/Field';
 import { acceptInvite, createInviteLink, inviteByEmail } from '../../lib/api';
+import { failureMessage } from '../../lib/failureMessage';
 import { inviteToken } from '../../lib/inviteToken';
 import { colors, spacing } from '../../lib/theme';
+
+type Section = 'link' | 'email' | 'code';
+
+type Feedback = { section: Section; text: string; failed: boolean };
 
 function inviteUrl(token: string): string {
   return Linking.createURL('/redeem', { queryParams: { token } });
@@ -17,21 +22,28 @@ export default function InviteScreen() {
   const [email, setEmail] = useState('');
   const [token, setToken] = useState('');
   const [link, setLink] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [creating, setCreating] = useState(false);
   const [sending, setSending] = useState(false);
   const [redeeming, setRedeeming] = useState(false);
 
+  const say = (section: Section, text: string) => setFeedback({ section, text, failed: false });
+  const fail = (section: Section, cause: unknown, fallback: string) =>
+    setFeedback({ section, text: failureMessage(cause, fallback), failed: true });
+
+  const renderFeedback = (section: Section) =>
+    feedback?.section === section ? (
+      <Text style={feedback.failed ? styles.error : styles.notice}>{feedback.text}</Text>
+    ) : null;
+
   const createLink = async () => {
     setCreating(true);
-    setError(null);
-    setNotice(null);
+    setFeedback(null);
     try {
       const created = await createInviteLink();
       setLink(inviteUrl(created.token));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not create an invite link');
+      fail('link', cause, 'Could not create an invite link');
     } finally {
       setCreating(false);
     }
@@ -40,7 +52,7 @@ export default function InviteScreen() {
   const copyLink = async () => {
     if (!link) return;
     await Clipboard.setStringAsync(link);
-    setNotice('Invite link copied.');
+    say('link', 'Invite link copied.');
   };
 
   const shareLink = async () => {
@@ -50,13 +62,13 @@ export default function InviteScreen() {
 
   const send = async () => {
     setSending(true);
-    setError(null);
-    setNotice(null);
+    setFeedback(null);
     try {
       const result = await inviteByEmail(email.trim());
 
       if (result.kind === 'friendship') {
-        setNotice(
+        say(
+          'email',
           result.status === 'accepted'
             ? 'You are already friends.'
             : 'Friend request sent. They will see it in the app.'
@@ -65,12 +77,12 @@ export default function InviteScreen() {
         await Share.share({
           message: `Join me on At The Bar: ${inviteUrl(result.token)}`,
         });
-        setNotice(`Invite created for ${result.email}.`);
+        say('email', `Invite created for ${result.email}.`);
       }
 
       setEmail('');
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not send the invite');
+      fail('email', cause, 'Could not send the invite');
     } finally {
       setSending(false);
     }
@@ -78,14 +90,13 @@ export default function InviteScreen() {
 
   const redeem = async () => {
     setRedeeming(true);
-    setError(null);
-    setNotice(null);
+    setFeedback(null);
     try {
       await acceptInvite(inviteToken(token));
-      setNotice('Invite accepted. You are now friends.');
+      say('code', 'Invite accepted. You are now friends.');
       setToken('');
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not accept the invite');
+      fail('code', cause, 'Could not accept the invite');
     } finally {
       setRedeeming(false);
     }
@@ -110,6 +121,7 @@ export default function InviteScreen() {
         ) : (
           <Button title="Create invite link" onPress={createLink} loading={creating} />
         )}
+        {renderFeedback('link')}
       </View>
 
       <View style={styles.section}>
@@ -126,6 +138,7 @@ export default function InviteScreen() {
           value={email}
         />
         <Button title="Send invite" onPress={send} loading={sending} disabled={!email.trim()} />
+        {renderFeedback('email')}
       </View>
 
       <View style={styles.section}>
@@ -139,10 +152,8 @@ export default function InviteScreen() {
           loading={redeeming}
           disabled={!token.trim()}
         />
+        {renderFeedback('code')}
       </View>
-
-      {notice ? <Text style={styles.notice}>{notice}</Text> : null}
-      {error ? <Text style={styles.error}>{error}</Text> : null}
     </ScrollView>
   );
 }

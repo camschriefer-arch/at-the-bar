@@ -1,19 +1,52 @@
+import * as Clipboard from 'expo-clipboard';
 import * as Linking from 'expo-linking';
 import { useState } from 'react';
 import { ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '../../components/Button';
 import { Field } from '../../components/Field';
-import { acceptInvite, inviteByEmail } from '../../lib/api';
+import { acceptInvite, createInviteLink, inviteByEmail } from '../../lib/api';
+import { inviteToken } from '../../lib/inviteToken';
 import { colors, spacing } from '../../lib/theme';
+
+function inviteUrl(token: string): string {
+  return Linking.createURL('/redeem', { queryParams: { token } });
+}
 
 export default function InviteScreen() {
   const [email, setEmail] = useState('');
   const [token, setToken] = useState('');
+  const [link, setLink] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
   const [sending, setSending] = useState(false);
   const [redeeming, setRedeeming] = useState(false);
+
+  const createLink = async () => {
+    setCreating(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const created = await createInviteLink();
+      setLink(inviteUrl(created.token));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not create an invite link');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const copyLink = async () => {
+    if (!link) return;
+    await Clipboard.setStringAsync(link);
+    setNotice('Invite link copied.');
+  };
+
+  const shareLink = async () => {
+    if (!link) return;
+    await Share.share({ message: `Join me on At The Bar: ${link}` });
+  };
 
   const send = async () => {
     setSending(true);
@@ -29,9 +62,8 @@ export default function InviteScreen() {
             : 'Friend request sent. They will see it in the app.'
         );
       } else {
-        const url = Linking.createURL('/redeem', { queryParams: { token: result.token } });
         await Share.share({
-          message: `Join me on At The Bar: ${url}`,
+          message: `Join me on At The Bar: ${inviteUrl(result.token)}`,
         });
         setNotice(`Invite created for ${result.email}.`);
       }
@@ -49,7 +81,7 @@ export default function InviteScreen() {
     setError(null);
     setNotice(null);
     try {
-      await acceptInvite(token.trim());
+      await acceptInvite(inviteToken(token));
       setNotice('Invite accepted. You are now friends.');
       setToken('');
     } catch (cause) {
@@ -62,7 +94,26 @@ export default function InviteScreen() {
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <View style={styles.section}>
-        <Text style={styles.title}>Invite a friend</Text>
+        <Text style={styles.title}>Invite by link</Text>
+        <Text style={styles.muted}>
+          Anyone who opens this link becomes your friend, so only send it to people you want
+          seeing when you are out. It lasts 30 days or until someone uses it.
+        </Text>
+        {link ? (
+          <>
+            <Text style={styles.link} selectable>
+              {link}
+            </Text>
+            <Button title="Copy link" onPress={copyLink} />
+            <Button title="Send it" variant="secondary" onPress={shareLink} />
+          </>
+        ) : (
+          <Button title="Create invite link" onPress={createLink} loading={creating} />
+        )}
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.title}>Invite by email</Text>
         <Text style={styles.muted}>
           If they already have an account they get a friend request. Otherwise you get an invite
           link to send them.
@@ -79,6 +130,7 @@ export default function InviteScreen() {
 
       <View style={styles.section}>
         <Text style={styles.title}>Have an invite code?</Text>
+        <Text style={styles.muted}>Paste the code or the whole link a friend sent you.</Text>
         <Field label="Invite code" autoCapitalize="none" onChangeText={setToken} value={token} />
         <Button
           title="Accept invite"
@@ -113,6 +165,14 @@ const styles = StyleSheet.create({
   },
   muted: {
     color: colors.muted,
+  },
+  link: {
+    backgroundColor: colors.surface,
+    borderRadius: 8,
+    borderColor: colors.border,
+    borderWidth: 1,
+    color: colors.text,
+    padding: spacing.sm,
   },
   notice: {
     color: colors.accent,

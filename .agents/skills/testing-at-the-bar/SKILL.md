@@ -181,3 +181,40 @@ To test friend-detail UI, re-set the other user's status with service-role SQL:
 
 - `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY_ANDROID` (and `_IOS`) — required only for map tile rendering.
   Supabase credentials are generated locally by `supabase start`.
+
+## Marketing / App Store screenshots at a custom resolution
+
+- Apple's 6.9" slot needs exactly 1290x2796 PNGs with no crop/scale. Create a dedicated AVD
+  instead of resizing later:
+  `avdmanager create avd -n atb69 -k "system-images;android-34;google_apis;x86_64" -d pixel_6`
+  then set `hw.lcd.width=1290`, `hw.lcd.height=2796`, `hw.lcd.density=480` in
+  `~/.android/avd/atb69.avd/config.ini`. Verify after boot with `adb shell wm size` /
+  `adb shell wm density` — `avdmanager` output does not echo the override.
+- A 1290x2796 guest is memory hungry: qemu reached ~5.2 GB RSS and was OOM-killed on a 8 GB box,
+  taking the Metro process with it. Add swap first (`fallocate -l 8G /swapfile2` + `mkswap` +
+  `swapon`) and boot with `-memory 3072`. After any suspected death, check
+  `curl -s http://127.0.0.1:8081/status` — a red box whose stack mentions
+  `loadJSBundleFromAssets` usually means Metro is gone, not an app bug; restart
+  `npx expo start --dev-client` and re-run `adb reverse tcp:8081 tcp:8081`.
+- High resolution also makes "System UI isn't responding" ANR dialogs more likely right after
+  boot; tap "Wait" (find its bounds in a uiautomator dump) rather than rebooting.
+- Clean status bar via SystemUI demo mode:
+  `adb shell settings put global sysui_demo_allowed 1` then broadcasts
+  `com.android.systemui.demo` with `command enter`, `clock -e hhmm 0941`,
+  `battery -e level 100 -e plugged false`, `network -e wifi show -e level 4 -e mobile show ...`,
+  `notifications -e visible false`, and `status -e location hide -e alarm hide ...` (mock GPS
+  otherwise leaves a location icon in the bar). Demo mode is LOST when SystemUI restarts/ANRs —
+  re-apply and re-capture; verify by OCR'ing the top 110 px (`tesseract`, note it reads 9:41 as
+  9:47) and by diffing the status-bar strip across captures (should be pixel-identical).
+- Judge image/map rendering without a display: crop the region and count unique colours
+  (`collections.Counter(img.crop(box).getdata())`). Loaded photos give tens of thousands of
+  colours; a blank map is a single flat colour. On this AVD Google Maps tiles DID render
+  (land `#f5f3f3`, park `#c3f1d5`, water `#90daee`, red marker `#ea3535`) — earlier grey-tile
+  reports were resolution/AVD specific, so always re-check before skipping a map screenshot.
+- Seed plausible marketing data with the service-role key: real venue row, 2-3 accepted
+  friendships (one with `set_current_bar` so they show under AT THE BAR), an avatar and 4 drink
+  posts uploaded to the private `avatars` / `drinks` buckets (rendered via signed URLs, TTL 1 h).
+  Use drink/bar imagery (e.g. loremflickr `beer,pint` / `cocktail,bar`), not generic placeholders,
+  and force-stop + relaunch the app after reseeding — `expo-image` caches the old signed URLs.
+- Screenshot copy note: the single-venue prompt reads "ARE YOU HERE?" + the bar name with
+  "Yes, I'm here" / "Not here"; it never literally says "Are you at <bar>?".

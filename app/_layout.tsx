@@ -47,7 +47,7 @@ function RootNavigator() {
       return;
     }
 
-    if (kind !== 'venue-confirm' || !barId) return;
+    if (kind !== 'venue-confirm' && kind !== 'venue-choose') return;
 
     // The response outlives its handling, so it is cleared to keep a relaunch
     // from checking the user in at a restaurant they left hours ago.
@@ -55,7 +55,7 @@ function RootNavigator() {
 
     if (tapped.actionIdentifier === VENUE_PROMPT_DISMISS) {
       void clearPendingVenue();
-    } else if (tapped.actionIdentifier === VENUE_PROMPT_CONFIRM) {
+    } else if (tapped.actionIdentifier === VENUE_PROMPT_CONFIRM && barId) {
       void checkInAt(barId);
     } else {
       // Tapping the notification itself opens the screen that asks again.

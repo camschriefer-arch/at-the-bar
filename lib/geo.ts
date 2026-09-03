@@ -59,6 +59,19 @@ export function tileBoundingBox(point: LatLng): BoundingBox {
   };
 }
 
+/** Everything inside `radiusMeters`, nearest first. */
+export function allWithin<T extends LatLng>(
+  point: LatLng,
+  candidates: readonly T[],
+  radiusMeters: number = AT_BAR_RADIUS_METERS
+): T[] {
+  return candidates
+    .map((item) => ({ item, meters: distanceMeters(point, item) }))
+    .filter(({ meters }) => meters <= radiusMeters)
+    .sort((a, b) => a.meters - b.meters)
+    .map(({ item }) => item);
+}
+
 export function nearestWithin<T extends LatLng>(
   point: LatLng,
   candidates: readonly T[],

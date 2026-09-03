@@ -252,7 +252,7 @@ export default function ProfileScreen() {
               />
             )}
             <Button
-              title="Not here"
+              title={pending.choices.length > 1 ? 'None of these' : 'Not here'}
               variant="secondary"
               onPress={() => void dismissPending()}
               disabled={busy}

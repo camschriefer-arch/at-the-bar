@@ -20,7 +20,11 @@ const PROMPT_COOLDOWN_MS = 6 * 60 * 60 * 1000;
 export type PendingChoice = { barId: string; barName: string };
 
 /** The venues the user was asked about, nearest first. */
-export type PendingVenue = { choices: PendingChoice[]; promptedAt: number };
+export type PendingVenue = {
+  choices: PendingChoice[];
+  promptedAt: number;
+  notificationId?: string;
+};
 
 type PromptedVenues = Record<string, number>;
 
@@ -93,15 +97,12 @@ export async function promptForVenues(bars: readonly Bar[], { force = false } = 
 
   await recordPrompts(bars.map((bar) => bar.id));
   const choices = bars.map((bar) => ({ barId: bar.id, barName: bar.name }));
-  await AsyncStorage.setItem(
-    PENDING_KEY,
-    JSON.stringify({ choices, promptedAt: Date.now() } satisfies PendingVenue)
-  );
+  await clearPendingVenue();
 
   const single = bars.length === 1 ? bars[0] : null;
 
   await ensureCategory();
-  await Notifications.scheduleNotificationAsync({
+  const notificationId = await Notifications.scheduleNotificationAsync({
     content: {
       title: 'At the bar?',
       body: single
@@ -115,6 +116,11 @@ export async function promptForVenues(bars: readonly Bar[], { force = false } = 
     },
     trigger: null,
   });
+
+  await AsyncStorage.setItem(
+    PENDING_KEY,
+    JSON.stringify({ choices, promptedAt: Date.now(), notificationId } satisfies PendingVenue)
+  );
 }
 
 /** The venue the user was last asked about and has not answered yet. */
@@ -135,6 +141,16 @@ export async function getPendingVenue(): Promise<PendingVenue | null> {
   }
 }
 
+/** Drops the pending prompt and takes its notification out of the tray. */
 export async function clearPendingVenue(): Promise<void> {
+  const raw = await AsyncStorage.getItem(PENDING_KEY);
   await AsyncStorage.removeItem(PENDING_KEY);
+  if (!raw) return;
+
+  try {
+    const { notificationId } = JSON.parse(raw) as PendingVenue;
+    if (notificationId) await Notifications.dismissNotificationAsync(notificationId);
+  } catch {
+    // Nothing to dismiss if the record was unreadable.
+  }
 }

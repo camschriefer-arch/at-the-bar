@@ -103,7 +103,12 @@ export default function InviteScreen() {
   };
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={styles.screen}
+      contentContainerStyle={styles.content}
+      automaticallyAdjustKeyboardInsets
+      keyboardDismissMode="interactive"
+      keyboardShouldPersistTaps="handled">
       <View style={styles.section}>
         <Text style={styles.title}>Invite by link</Text>
         <Text style={styles.muted}>

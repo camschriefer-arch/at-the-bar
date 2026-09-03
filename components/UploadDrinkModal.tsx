@@ -105,7 +105,12 @@ export function UploadDrinkModal({ visible, userId, onClose, onSaved }: UploadDr
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+      <ScrollView
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        automaticallyAdjustKeyboardInsets
+        keyboardDismissMode="interactive"
+        keyboardShouldPersistTaps="handled">
         <Text style={styles.title}>Upload your drink</Text>
 
         <Pressable
@@ -143,6 +148,7 @@ export function UploadDrinkModal({ visible, userId, onClose, onSaved }: UploadDr
           value={description}
           onChangeText={setDescription}
           placeholder="Short note about it"
+          style={styles.note}
           multiline
         />
 
@@ -195,6 +201,10 @@ const styles = StyleSheet.create({
   photo: {
     height: '100%',
     width: '100%',
+  },
+  note: {
+    minHeight: 88,
+    textAlignVertical: 'top',
   },
   label: {
     color: colors.muted,

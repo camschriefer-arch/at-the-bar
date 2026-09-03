@@ -224,7 +224,7 @@ export default function ProfileScreen() {
           <Text style={styles.label}>Are you here?</Text>
           <Text style={styles.barName}>{pending.barName}</Text>
           <Text style={styles.muted}>
-            It is a restaurant, so we only share it if you say you are there.
+            Nothing is shared until you say you are there.
           </Text>
           <View style={styles.actions}>
             <Button

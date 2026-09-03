@@ -12,8 +12,8 @@ const PROMPTED_KEY = 'atb:promptedVenues';
 
 /**
  * A venue is only asked about once per visit: long enough that walking past the
- * same restaurant twice in an evening does not nag, short enough that going back
- * the next day asks again.
+ * same bar twice in an evening does not nag, short enough that going back the
+ * next day asks again.
  */
 const PROMPT_COOLDOWN_MS = 6 * 60 * 60 * 1000;
 
@@ -73,12 +73,12 @@ export async function wasRecentlyPrompted(barId: string): Promise<boolean> {
 }
 
 /**
- * Asks whether the user is at `bar`. Restaurants are in the catalog but never
- * set a status on their own, so this notification is the only way one becomes
- * a check-in.
+ * Asks whether the user is at `bar`. No venue sets a status on its own, so an
+ * answered prompt is the only way one becomes a check-in. `force` re-asks
+ * inside the cooldown, for a prompt the user asked for by hand.
  */
-export async function promptForVenue(bar: Bar): Promise<void> {
-  if (await wasRecentlyPrompted(bar.id)) return;
+export async function promptForVenue(bar: Bar, { force = false } = {}): Promise<void> {
+  if (!force && (await wasRecentlyPrompted(bar.id))) return;
 
   await recordPrompt(bar.id);
   await AsyncStorage.setItem(

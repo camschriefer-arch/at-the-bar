@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import type { Bar, VenueCategory } from '../lib/types.ts';
-import { DWELL_MS, noteSighting, resolveVenueAt, restaurantToConfirm } from '../lib/venues.ts';
+import { DWELL_MS, noteSighting, stillAt, venueToConfirm } from '../lib/venues.ts';
 
 const here = { lat: 42.3798562, lng: -71.2629227 };
 
@@ -22,39 +22,34 @@ const venue = (
   category,
 });
 
-test('the nearest bar checks a user in', () => {
-  const bars = [venue('far', 'bar', 60), venue('near', 'pub', 10)];
+test('no venue checks a user in on its own', () => {
+  const venues = [venue('pub', 'pub', 5), venue('jakes', 'restaurant', 8)];
 
-  assert.equal(resolveVenueAt(here, bars, null)?.id, 'near');
+  assert.equal(stillAt(here, venues, null), null);
 });
 
-test('a restaurant never checks a user in on its own', () => {
-  const venues = [venue('jakes', 'restaurant', 5)];
+test('the nearest venue of any category is the one asked about', () => {
+  const venues = [venue('far', 'bar', 60), venue('jakes', 'restaurant', 10)];
 
-  assert.equal(resolveVenueAt(here, venues, null), null);
-  assert.equal(restaurantToConfirm(here, venues)?.id, 'jakes');
+  assert.equal(venueToConfirm(here, venues)?.id, 'jakes');
 });
 
-test('a confirmed restaurant stays the status while the user is near it', () => {
-  const venues = [venue('jakes', 'restaurant', 100), venue('pub', 'bar', 70)];
-
-  // 100 m is past the check-in radius but inside the leave radius.
-  assert.equal(resolveVenueAt(here, venues, 'jakes')?.id, 'jakes');
-  assert.equal(resolveVenueAt(here, venues, null)?.id, 'pub');
+test('only a venue within the check-in radius is asked about', () => {
+  assert.equal(venueToConfirm(here, [venue('pub', 'pub', 300)]), null);
 });
 
-test('leaving a confirmed restaurant clears the status', () => {
+test('a confirmed venue stays the status while the user is near it', () => {
+  const venues = [venue('jakes', 'restaurant', 100), venue('pub', 'bar', 10)];
+
+  // 100 m is past the check-in radius but inside the leave radius, and a
+  // closer bar does not take over a confirmed status.
+  assert.equal(stillAt(here, venues, 'jakes')?.id, 'jakes');
+});
+
+test('leaving a confirmed venue clears the status', () => {
   const venues = [venue('jakes', 'restaurant', 300)];
 
-  assert.equal(resolveVenueAt(here, venues, 'jakes'), null);
-});
-
-test('a nearby bar is not asked about', () => {
-  assert.equal(restaurantToConfirm(here, [venue('pub', 'pub', 10)]), null);
-});
-
-test('only a restaurant within the check-in radius is asked about', () => {
-  assert.equal(restaurantToConfirm(here, [venue('jakes', 'restaurant', 300)]), null);
+  assert.equal(stillAt(here, venues, 'jakes'), null);
 });
 
 test('a first sighting starts the clock and counts for nothing', () => {

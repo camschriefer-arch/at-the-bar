@@ -4,7 +4,7 @@ import { barsNear } from './barCache';
 import { type LatLng } from './geo';
 import { flushPendingNotifications } from './notifications';
 import { supabase } from './supabase';
-import { noteSighting, resolveVenueAt, restaurantToConfirm, type Sighting } from './venues';
+import { noteSighting, stillAt, venueToConfirm, type Sighting } from './venues';
 import { clearPendingVenue, promptForVenue } from './venuePrompt';
 import type { Bar } from './types';
 
@@ -42,11 +42,12 @@ async function writeStatus(barId: string | null): Promise<void> {
 }
 
 /**
- * Resolves the venue for `point` on device and pushes the result to the server
- * only when it differs from the last value we sent. A venue counts only once
- * the user has stayed near it for `DWELL_MS`, so passing one changes nothing;
- * `immediate` skips that wait for a check-in the user asked for by hand. When
- * the only candidate is a restaurant, nothing is sent and the user is asked.
+ * Keeps a confirmed status alive while the user stays put, drops it once they
+ * leave, and asks about a new venue after they have been near it for
+ * `DWELL_MS`. Nothing is ever sent to the server without the user answering
+ * that prompt: the bar downstairs from an office would otherwise have people at
+ * the bar all day. `immediate` skips the dwell and the once-per-visit cooldown,
+ * for a prompt the user asked for by hand.
  */
 export async function syncStatusForLocation(
   point: LatLng,
@@ -54,36 +55,31 @@ export async function syncStatusForLocation(
 ): Promise<ResolvedStatus> {
   const lastBarId = await AsyncStorage.getItem(LAST_BAR_KEY);
   const venues = await barsNear(point);
-  const bar = resolveVenueAt(point, venues, lastBarId);
-  const candidate = bar ?? restaurantToConfirm(point, venues);
+  const current = stillAt(point, venues, lastBarId);
 
-  // Nothing in range: drop the status right away rather than after a dwell, so
-  // leaving is never reported late.
-  if (!candidate) {
+  if (current) {
     await AsyncStorage.removeItem(SIGHTING_KEY);
-    if (!lastBarId) return { bar: null, changed: false };
+    return { bar: current, changed: false };
+  }
 
+  // Leaving is reported straight away rather than after a dwell.
+  const left = lastBarId !== null;
+  if (left) {
     await writeStatus(null);
     await clearPendingVenue();
-    return { bar: null, changed: true };
   }
 
-  if (candidate.id === lastBarId) {
+  const candidate = venueToConfirm(point, venues);
+  if (!candidate) {
     await AsyncStorage.removeItem(SIGHTING_KEY);
-    return { bar, changed: false };
+    return { bar: null, changed: left };
   }
 
-  if (!immediate && !(await hasDwelled(candidate.id))) {
-    return { bar: venues.find((venue) => venue.id === lastBarId) ?? null, changed: false };
+  if (immediate || (await hasDwelled(candidate.id))) {
+    await promptForVenue(candidate, { force: immediate });
   }
 
-  if (!bar) {
-    await promptForVenue(candidate);
-    return { bar: null, changed: false };
-  }
-
-  await writeStatus(bar.id);
-  return { bar, changed: true };
+  return { bar: null, changed: left };
 }
 
 /** Checks the user in at a venue they confirmed they are at. */

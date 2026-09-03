@@ -35,8 +35,8 @@ const STATES = {
   WA: 'Washington', WV: 'West Virginia', WI: 'Wisconsin', WY: 'Wyoming',
 };
 
-// Bars and pubs check a user in on their own; restaurants only do so after the
-// user confirms a prompt, because plenty of them are places nobody drinks at.
+// Restaurants are in because plenty of them are where people actually drink;
+// no category checks a user in without them confirming a prompt anyway.
 const CATEGORIES = ['bar', 'pub', 'restaurant'];
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));

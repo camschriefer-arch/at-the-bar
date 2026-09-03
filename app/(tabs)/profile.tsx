@@ -99,7 +99,7 @@ export default function ProfileScreen() {
       if (level === 'background') await startBackgroundUpdates();
 
       const point = await getCurrentPoint();
-      const result = await syncStatusForLocation(point);
+      const result = await syncStatusForLocation(point, { immediate: true });
       setBar(result.bar);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not enable sharing');
@@ -178,8 +178,11 @@ export default function ProfileScreen() {
     setError(null);
     try {
       const point = await getCurrentPoint();
-      const result = await syncStatusForLocation(point);
+      // Asked for by hand, so it does not wait out the dwell the background
+      // checks use.
+      const result = await syncStatusForLocation(point, { immediate: true });
       setBar(result.bar);
+      setPending(result.bar ? null : await getPendingVenue());
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not check your location');
     } finally {

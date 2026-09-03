@@ -26,6 +26,31 @@ export function resolveVenueAt(
   return nearestWithin(point, venues.filter(checksInAutomatically))?.item ?? null;
 }
 
+/**
+ * How long a user has to stay near a venue before it counts. Walking or driving
+ * past a bar takes seconds; this is what keeps a commute from setting a status
+ * or firing a string of "are you here?" notifications.
+ */
+export const DWELL_MS = 3 * 60 * 1000;
+
+export type Sighting = { barId: string; since: number };
+
+/**
+ * Folds a sighting of `barId` into what we knew, and says whether the user has
+ * now been there long enough. Moving to a different venue restarts the clock.
+ */
+export function noteSighting(
+  previous: Sighting | null,
+  barId: string,
+  now: number
+): { sighting: Sighting; dwelled: boolean } {
+  if (!previous || previous.barId !== barId || previous.since > now) {
+    return { sighting: { barId, since: now }, dwelled: false };
+  }
+
+  return { sighting: previous, dwelled: now - previous.since >= DWELL_MS };
+}
+
 /** The restaurant close enough to be worth asking the user about, if any. */
 export function restaurantToConfirm(point: LatLng, venues: readonly Bar[]): Bar | null {
   const candidates = venues.filter((venue) => !checksInAutomatically(venue));

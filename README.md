@@ -3,7 +3,7 @@
 iOS + Android app that shows which of your friends are out at a bar right now, and nothing else about where they are.
 
 - Sign up with email, add friends by email invite, accept requests.
-- The phone checks whether you are within **0.05 miles** of a bar. If you are, your status becomes _At the bar_ with the bar's name.
+- The phone checks whether you are within **0.05 miles** of a bar. Stay there for **3 minutes** and your status becomes _At the bar_ with the bar's name, so driving or walking past one changes nothing. "Check in now" skips the wait.
 - Restaurants are in the catalog too, but never check you in on their own: get near one and the app asks "Are you at Jake & Joe's?", and only a yes sets your status.
 - Friends who accepted your request see that status and, on your profile, a map pin on the bar.
 - Friends get a push notification when you arrive at or leave a bar ("Bob is at the bar"), naming you but not the bar.

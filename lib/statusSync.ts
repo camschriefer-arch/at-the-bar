@@ -4,13 +4,32 @@ import { barsNear } from './barCache';
 import { type LatLng } from './geo';
 import { flushPendingNotifications } from './notifications';
 import { supabase } from './supabase';
-import { resolveVenueAt, restaurantToConfirm } from './venues';
+import { noteSighting, resolveVenueAt, restaurantToConfirm, type Sighting } from './venues';
 import { clearPendingVenue, promptForVenue } from './venuePrompt';
 import type { Bar } from './types';
 
 const LAST_BAR_KEY = 'atb:lastBarId';
+const SIGHTING_KEY = 'atb:sighting';
 
 export type ResolvedStatus = { bar: Bar | null; changed: boolean };
+
+async function readSighting(): Promise<Sighting | null> {
+  const raw = await AsyncStorage.getItem(SIGHTING_KEY);
+  if (!raw) return null;
+
+  try {
+    return JSON.parse(raw) as Sighting;
+  } catch {
+    return null;
+  }
+}
+
+/** Whether the user has been at `barId` long enough for it to count. */
+async function hasDwelled(barId: string): Promise<boolean> {
+  const { sighting, dwelled } = noteSighting(await readSighting(), barId, Date.now());
+  await AsyncStorage.setItem(SIGHTING_KEY, JSON.stringify(sighting));
+  return dwelled;
+}
 
 async function writeStatus(barId: string | null): Promise<void> {
   const { error } = await supabase.rpc('set_current_bar', { p_bar_id: barId });
@@ -24,25 +43,46 @@ async function writeStatus(barId: string | null): Promise<void> {
 
 /**
  * Resolves the venue for `point` on device and pushes the result to the server
- * only when it differs from the last value we sent. When the only candidate is
- * a restaurant, nothing is sent and the user is asked instead.
+ * only when it differs from the last value we sent. A venue counts only once
+ * the user has stayed near it for `DWELL_MS`, so passing one changes nothing;
+ * `immediate` skips that wait for a check-in the user asked for by hand. When
+ * the only candidate is a restaurant, nothing is sent and the user is asked.
  */
-export async function syncStatusForLocation(point: LatLng): Promise<ResolvedStatus> {
+export async function syncStatusForLocation(
+  point: LatLng,
+  { immediate = false }: { immediate?: boolean } = {}
+): Promise<ResolvedStatus> {
   const lastBarId = await AsyncStorage.getItem(LAST_BAR_KEY);
   const venues = await barsNear(point);
   const bar = resolveVenueAt(point, venues, lastBarId);
+  const candidate = bar ?? restaurantToConfirm(point, venues);
 
-  if (!bar) {
-    const restaurant = restaurantToConfirm(point, venues);
-    if (restaurant) await promptForVenue(restaurant);
+  // Nothing in range: drop the status right away rather than after a dwell, so
+  // leaving is never reported late.
+  if (!candidate) {
+    await AsyncStorage.removeItem(SIGHTING_KEY);
+    if (!lastBarId) return { bar: null, changed: false };
+
+    await writeStatus(null);
+    await clearPendingVenue();
+    return { bar: null, changed: true };
   }
 
-  const barId = bar?.id ?? null;
-  if (barId === lastBarId) return { bar, changed: false };
+  if (candidate.id === lastBarId) {
+    await AsyncStorage.removeItem(SIGHTING_KEY);
+    return { bar, changed: false };
+  }
 
-  await writeStatus(barId);
-  if (!barId) await clearPendingVenue();
+  if (!immediate && !(await hasDwelled(candidate.id))) {
+    return { bar: venues.find((venue) => venue.id === lastBarId) ?? null, changed: false };
+  }
 
+  if (!bar) {
+    await promptForVenue(candidate);
+    return { bar: null, changed: false };
+  }
+
+  await writeStatus(bar.id);
   return { bar, changed: true };
 }
 
@@ -53,7 +93,7 @@ export async function checkInAt(barId: string): Promise<void> {
 }
 
 export async function clearStatus(): Promise<void> {
-  await AsyncStorage.removeItem(LAST_BAR_KEY);
+  await AsyncStorage.multiRemove([LAST_BAR_KEY, SIGHTING_KEY]);
   await supabase.rpc('set_current_bar', { p_bar_id: null });
   await clearPendingVenue();
   await flushPendingNotifications();

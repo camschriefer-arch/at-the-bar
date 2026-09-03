@@ -17,7 +17,14 @@ const PROMPTED_KEY = 'atb:promptedVenues';
  */
 const PROMPT_COOLDOWN_MS = 6 * 60 * 60 * 1000;
 
-export type PendingVenue = { barId: string; barName: string; promptedAt: number };
+export type PendingChoice = { barId: string; barName: string };
+
+/** The venues the user was asked about, nearest first. */
+export type PendingVenue = {
+  choices: PendingChoice[];
+  promptedAt: number;
+  notificationId?: string;
+};
 
 type PromptedVenues = Record<string, number>;
 
@@ -54,13 +61,14 @@ async function readPrompted(): Promise<PromptedVenues> {
   }
 }
 
-async function recordPrompt(barId: string): Promise<void> {
+async function recordPrompts(barIds: readonly string[]): Promise<void> {
   const prompted = await readPrompted();
-  const cutoff = Date.now() - PROMPT_COOLDOWN_MS;
+  const now = Date.now();
+  const cutoff = now - PROMPT_COOLDOWN_MS;
 
-  const kept: PromptedVenues = { [barId]: Date.now() };
+  const kept: PromptedVenues = Object.fromEntries(barIds.map((id) => [id, now]));
   for (const [id, at] of Object.entries(prompted)) {
-    if (at > cutoff) kept[id] = at;
+    if (at > cutoff && kept[id] === undefined) kept[id] = at;
   }
 
   await AsyncStorage.setItem(PROMPTED_KEY, JSON.stringify(kept));
@@ -73,29 +81,46 @@ export async function wasRecentlyPrompted(barId: string): Promise<boolean> {
 }
 
 /**
- * Asks whether the user is at `bar`. No venue sets a status on its own, so an
- * answered prompt is the only way one becomes a check-in. `force` re-asks
- * inside the cooldown, for a prompt the user asked for by hand.
+ * Asks whether the user is at one of `bars` (nearest first). No venue sets a
+ * status on its own, so an answered prompt is the only way one becomes a
+ * check-in. Several venues in range get one notification rather than one each:
+ * the phone cannot tell which of two adjacent bars you are in, so the user
+ * picks from a list in the app. `force` re-asks inside the cooldown, for a
+ * prompt the user asked for by hand.
  */
-export async function promptForVenue(bar: Bar, { force = false } = {}): Promise<void> {
-  if (!force && (await wasRecentlyPrompted(bar.id))) return;
+export async function promptForVenues(bars: readonly Bar[], { force = false } = {}): Promise<void> {
+  if (bars.length === 0) return;
+  // Asking again about any one of them would land on the same list.
+  if (!force && (await Promise.all(bars.map((bar) => wasRecentlyPrompted(bar.id)))).some(Boolean)) {
+    return;
+  }
 
-  await recordPrompt(bar.id);
-  await AsyncStorage.setItem(
-    PENDING_KEY,
-    JSON.stringify({ barId: bar.id, barName: bar.name, promptedAt: Date.now() } satisfies PendingVenue)
-  );
+  await recordPrompts(bars.map((bar) => bar.id));
+  const choices = bars.map((bar) => ({ barId: bar.id, barName: bar.name }));
+  await clearPendingVenue();
+
+  const single = bars.length === 1 ? bars[0] : null;
 
   await ensureCategory();
-  await Notifications.scheduleNotificationAsync({
+  const notificationId = await Notifications.scheduleNotificationAsync({
     content: {
       title: 'At the bar?',
-      body: `Are you at ${bar.name}? Tap yes and your friends will see it.`,
-      categoryIdentifier: VENUE_PROMPT_CATEGORY,
-      data: { kind: 'venue-confirm', barId: bar.id },
+      body: single
+        ? `Are you at ${single.name}? Tap yes and your friends will see it.`
+        : 'There is more than one bar around you. Open the app to check in and pick the one you are at.',
+      // A list cannot be picked from a notification button.
+      ...(single ? { categoryIdentifier: VENUE_PROMPT_CATEGORY } : {}),
+      data: single
+        ? { kind: 'venue-confirm', barId: single.id }
+        : { kind: 'venue-choose' },
     },
     trigger: null,
   });
+
+  await AsyncStorage.setItem(
+    PENDING_KEY,
+    JSON.stringify({ choices, promptedAt: Date.now(), notificationId } satisfies PendingVenue)
+  );
 }
 
 /** The venue the user was last asked about and has not answered yet. */
@@ -106,7 +131,7 @@ export async function getPendingVenue(): Promise<PendingVenue | null> {
   try {
     const pending = JSON.parse(raw) as PendingVenue;
     // An unanswered prompt is stale once the cooldown that suppresses it ends.
-    if (Date.now() - pending.promptedAt > PROMPT_COOLDOWN_MS) {
+    if (!pending.choices?.length || Date.now() - pending.promptedAt > PROMPT_COOLDOWN_MS) {
       await clearPendingVenue();
       return null;
     }
@@ -116,6 +141,16 @@ export async function getPendingVenue(): Promise<PendingVenue | null> {
   }
 }
 
+/** Drops the pending prompt and takes its notification out of the tray. */
 export async function clearPendingVenue(): Promise<void> {
+  const raw = await AsyncStorage.getItem(PENDING_KEY);
   await AsyncStorage.removeItem(PENDING_KEY);
+  if (!raw) return;
+
+  try {
+    const { notificationId } = JSON.parse(raw) as PendingVenue;
+    if (notificationId) await Notifications.dismissNotificationAsync(notificationId);
+  } catch {
+    // Nothing to dismiss if the record was unreadable.
+  }
 }

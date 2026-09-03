@@ -1,4 +1,4 @@
-export const AT_BAR_RADIUS_MILES = 0.05;
+export const AT_BAR_RADIUS_MILES = 0.03;
 export const AT_BAR_RADIUS_METERS = AT_BAR_RADIUS_MILES * 1609.344;
 
 /**
@@ -57,6 +57,19 @@ export function tileBoundingBox(point: LatLng): BoundingBox {
     maxLat: lat + TILE_DEGREES + TILE_PADDING_DEGREES,
     maxLng: lng + TILE_DEGREES + TILE_PADDING_DEGREES,
   };
+}
+
+/** Everything inside `radiusMeters`, nearest first. */
+export function allWithin<T extends LatLng>(
+  point: LatLng,
+  candidates: readonly T[],
+  radiusMeters: number = AT_BAR_RADIUS_METERS
+): T[] {
+  return candidates
+    .map((item) => ({ item, meters: distanceMeters(point, item) }))
+    .filter(({ meters }) => meters <= radiusMeters)
+    .sort((a, b) => a.meters - b.meters)
+    .map(({ item }) => item);
 }
 
 export function nearestWithin<T extends LatLng>(

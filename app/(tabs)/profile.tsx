@@ -221,19 +221,38 @@ export default function ProfileScreen() {
 
       {pending && sharing ? (
         <View style={styles.card}>
-          <Text style={styles.label}>Are you here?</Text>
-          <Text style={styles.barName}>{pending.barName}</Text>
-          <Text style={styles.muted}>
-            Nothing is shared until you say you are there.
+          <Text style={styles.label}>
+            {pending.choices.length > 1 ? 'Which one are you at?' : 'Are you here?'}
           </Text>
+          {pending.choices.length > 1 ? (
+            <Text style={styles.muted}>
+              There is more than one bar around you. Nothing is shared until you pick one.
+            </Text>
+          ) : (
+            <>
+              <Text style={styles.barName}>{pending.choices[0].barName}</Text>
+              <Text style={styles.muted}>Nothing is shared until you say you are there.</Text>
+            </>
+          )}
           <View style={styles.actions}>
+            {pending.choices.length > 1 ? (
+              pending.choices.map((choice) => (
+                <Button
+                  key={choice.barId}
+                  title={choice.barName}
+                  onPress={() => void confirmPending(choice.barId)}
+                  disabled={busy}
+                />
+              ))
+            ) : (
+              <Button
+                title="Yes, I'm here"
+                onPress={() => void confirmPending(pending.choices[0].barId)}
+                loading={busy}
+              />
+            )}
             <Button
-              title="Yes, I'm here"
-              onPress={() => void confirmPending(pending.barId)}
-              loading={busy}
-            />
-            <Button
-              title="Not here"
+              title={pending.choices.length > 1 ? 'None of these' : 'Not here'}
               variant="secondary"
               onPress={() => void dismissPending()}
               disabled={busy}

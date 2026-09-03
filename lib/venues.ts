@@ -1,9 +1,9 @@
-import { AT_BAR_RADIUS_METERS, nearestWithin, type LatLng } from './geo.ts';
+import { allWithin, AT_BAR_RADIUS_METERS, nearestWithin, type LatLng } from './geo.ts';
 import type { Bar } from './types';
 
 /**
- * A user has to get within 0.05 mi to check in but only drops off the map past
- * 0.075 mi, so GPS jitter at the edge of a bar does not flap the status.
+ * A user has to get within 0.03 mi to check in but only drops off the map past
+ * 0.045 mi, so GPS jitter at the edge of a bar does not flap the status.
  */
 export const LEAVE_RADIUS_METERS = AT_BAR_RADIUS_METERS * 1.5;
 
@@ -48,7 +48,25 @@ export function noteSighting(
   return { sighting: previous, dwelled: now - previous.since >= DWELL_MS };
 }
 
-/** The venue close enough to be worth asking the user about, if any. */
-export function venueToConfirm(point: LatLng, venues: readonly Bar[]): Bar | null {
-  return nearestWithin(point, venues)?.item ?? null;
+/**
+ * How many venues a user is asked to pick between. Dense blocks can have a
+ * dozen in range, which is a list nobody reads.
+ */
+export const MAX_CHOICES = 5;
+
+/** The venues close enough to be worth asking the user about, nearest first. */
+export function venuesToConfirm(point: LatLng, venues: readonly Bar[]): Bar[] {
+  return allWithin(point, venues).slice(0, MAX_CHOICES);
+}
+
+/**
+ * Key for the dwell clock over a set of venues. Which of two neighbouring bars
+ * is nearest flips with GPS jitter, so keying on the nearest one alone would
+ * keep restarting the clock; the set as a whole is what has to stay put.
+ */
+export function sightingKey(venues: readonly Bar[]): string {
+  return venues
+    .map((venue) => venue.id)
+    .sort()
+    .join(',');
 }

@@ -2,7 +2,14 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import type { Bar, VenueCategory } from '../lib/types.ts';
-import { DWELL_MS, noteSighting, stillAt, venueToConfirm } from '../lib/venues.ts';
+import {
+  DWELL_MS,
+  MAX_CHOICES,
+  noteSighting,
+  sightingKey,
+  stillAt,
+  venuesToConfirm,
+} from '../lib/venues.ts';
 
 const here = { lat: 42.3798562, lng: -71.2629227 };
 
@@ -28,20 +35,39 @@ test('no venue checks a user in on its own', () => {
   assert.equal(stillAt(here, venues, null), null);
 });
 
-test('the nearest venue of any category is the one asked about', () => {
-  const venues = [venue('far', 'bar', 60), venue('jakes', 'restaurant', 10)];
+test('every venue in range is asked about, of any category, nearest first', () => {
+  const venues = [venue('far', 'bar', 40), venue('jakes', 'restaurant', 10)];
 
-  assert.equal(venueToConfirm(here, venues)?.id, 'jakes');
+  assert.deepEqual(
+    venuesToConfirm(here, venues).map((v) => v.id),
+    ['jakes', 'far']
+  );
 });
 
-test('only a venue within the check-in radius is asked about', () => {
-  assert.equal(venueToConfirm(here, [venue('pub', 'pub', 300)]), null);
+test('only venues within the check-in radius are asked about', () => {
+  assert.deepEqual(venuesToConfirm(here, [venue('pub', 'pub', 300)]), []);
+});
+
+test('the list of venues to pick from is capped', () => {
+  const venues = Array.from({ length: MAX_CHOICES + 3 }, (_, i) =>
+    venue(`bar-${i}`, 'bar', i * 5)
+  );
+
+  assert.equal(venuesToConfirm(here, venues).length, MAX_CHOICES);
+});
+
+test('the dwell clock ignores which of the nearby venues is closest', () => {
+  const a = venue('a', 'bar', 10);
+  const b = venue('b', 'pub', 20);
+
+  assert.equal(sightingKey([a, b]), sightingKey([b, a]));
+  assert.notEqual(sightingKey([a, b]), sightingKey([a]));
 });
 
 test('a confirmed venue stays the status while the user is near it', () => {
-  const venues = [venue('jakes', 'restaurant', 100), venue('pub', 'bar', 10)];
+  const venues = [venue('jakes', 'restaurant', 60), venue('pub', 'bar', 10)];
 
-  // 100 m is past the check-in radius but inside the leave radius, and a
+  // 60 m is past the check-in radius but inside the leave radius, and a
   // closer bar does not take over a confirmed status.
   assert.equal(stillAt(here, venues, 'jakes')?.id, 'jakes');
 });

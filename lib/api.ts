@@ -6,6 +6,7 @@ import type {
   InviteLink,
   InviteResult,
   Profile,
+  TopBar,
   UserStatus,
 } from './types';
 
@@ -84,6 +85,17 @@ export async function fetchMyStatus(userId: string): Promise<{ status: UserStatu
   const { bar, ...status } = data;
   const resolved = (Array.isArray(bar) ? bar[0] : bar) as Bar | undefined;
   return { status: status as UserStatus, bar: resolved ?? null };
+}
+
+export async function fetchTopBars(userId: string, limit = 5): Promise<TopBar[]> {
+  const { data, error } = await supabase.rpc('top_bars', { p_user_id: userId, p_limit: limit });
+  if (error) throw error;
+  return (data ?? []) as TopBar[];
+}
+
+export async function forgetBar(barId: string): Promise<void> {
+  const { error } = await supabase.rpc('forget_bar', { p_bar_id: barId });
+  if (error) throw error;
 }
 
 /**

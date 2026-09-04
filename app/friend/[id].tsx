@@ -6,10 +6,11 @@ import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { Avatar } from '../../components/Avatar';
 import { Button } from '../../components/Button';
 import { DrinkGallery } from '../../components/DrinkGallery';
-import { fetchFriendFeed, removeFriend } from '../../lib/api';
+import { TopBars } from '../../components/TopBars';
+import { fetchFriendFeed, fetchTopBars, removeFriend } from '../../lib/api';
 import { fetchDrinkPosts, signedAvatarUrl, signedDrinkUrls } from '../../lib/photos';
 import { colors, spacing } from '../../lib/theme';
-import type { DrinkPost, FriendFeedRow } from '../../lib/types';
+import type { DrinkPost, FriendFeedRow, TopBar } from '../../lib/types';
 
 const MAP_SPAN_DEGREES = 0.01;
 
@@ -19,6 +20,7 @@ export default function FriendScreen() {
   const [friend, setFriend] = useState<FriendFeedRow | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [posts, setPosts] = useState<DrinkPost[]>([]);
+  const [topBars, setTopBars] = useState<TopBar[]>([]);
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [removing, setRemoving] = useState(false);
@@ -34,8 +36,12 @@ export default function FriendScreen() {
       if (!row) return;
 
       // Only reachable for an accepted friend; the database enforces the same rule.
-      const drinks = await fetchDrinkPosts(row.friend_id);
+      const [drinks, frequented] = await Promise.all([
+        fetchDrinkPosts(row.friend_id),
+        fetchTopBars(row.friend_id),
+      ]);
       setPosts(drinks);
+      setTopBars(frequented);
       const [avatar, urls] = await Promise.all([
         signedAvatarUrl(row.avatar_url),
         signedDrinkUrls(drinks),
@@ -142,6 +148,14 @@ export default function FriendScreen() {
           </Text>
         </View>
       )}
+
+      <View style={styles.gallery}>
+        <Text style={styles.status}>Frequently visited</Text>
+        <TopBars
+          bars={topBars}
+          emptyLabel={`${friend.display_name} has not checked in anywhere yet.`}
+        />
+      </View>
 
       <View style={styles.gallery}>
         <Text style={styles.status}>Their drinks</Text>

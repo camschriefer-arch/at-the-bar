@@ -36,6 +36,15 @@ export type FriendFeedRow = {
   arrived_at: string | null;
 };
 
+export type TopBar = {
+  bar_id: string;
+  bar_name: string;
+  bar_city: string | null;
+  bar_state: string | null;
+  visits: number;
+  last_visit: string;
+};
+
 export type DrinkPost = {
   id: string;
   user_id: string;

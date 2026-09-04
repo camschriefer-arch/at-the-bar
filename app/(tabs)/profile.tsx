@@ -5,8 +5,9 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Avatar } from '../../components/Avatar';
 import { Button } from '../../components/Button';
 import { DrinkGallery } from '../../components/DrinkGallery';
+import { TopBars } from '../../components/TopBars';
 import { UploadDrinkModal } from '../../components/UploadDrinkModal';
-import { fetchMyProfile, fetchMyStatus } from '../../lib/api';
+import { fetchMyProfile, fetchMyStatus, fetchTopBars, forgetBar } from '../../lib/api';
 import { useAuth } from '../../lib/AuthProvider';
 import {
   getPermissionLevel,
@@ -27,7 +28,7 @@ import {
 import { isSharingEnabled, setSharingEnabled } from '../../lib/sharing';
 import { checkInAt, clearStatus, syncStatusForLocation } from '../../lib/statusSync';
 import { colors, spacing } from '../../lib/theme';
-import type { Bar, DrinkPost, Profile } from '../../lib/types';
+import type { Bar, DrinkPost, Profile, TopBar } from '../../lib/types';
 import { clearPendingVenue, getPendingVenue, type PendingVenue } from '../../lib/venuePrompt';
 
 export default function ProfileScreen() {
@@ -40,6 +41,7 @@ export default function ProfileScreen() {
   const [sharing, setSharing] = useState(true);
   const [pending, setPending] = useState<PendingVenue | null>(null);
   const [posts, setPosts] = useState<DrinkPost[]>([]);
+  const [topBars, setTopBars] = useState<TopBar[]>([]);
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -49,15 +51,17 @@ export default function ProfileScreen() {
   const load = useCallback(async () => {
     if (!userId) return;
     try {
-      const [me, status, level, enabled, drinks, prompt] = await Promise.all([
+      const [me, status, level, enabled, drinks, frequented, prompt] = await Promise.all([
         fetchMyProfile(userId),
         fetchMyStatus(userId),
         getPermissionLevel(),
         isSharingEnabled(),
         fetchDrinkPosts(userId),
+        fetchTopBars(userId),
         getPendingVenue(),
       ]);
       setProfile(me);
+      setTopBars(frequented);
       setBar(status.bar);
       setPermission(level);
       setSharing(enabled);
@@ -153,6 +157,16 @@ export default function ProfileScreen() {
       setAvatarUrl(await signedAvatarUrl(path));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not update your photo');
+    }
+  };
+
+  const forget = async (bar: TopBar) => {
+    setError(null);
+    try {
+      await forgetBar(bar.bar_id);
+      setTopBars((current) => current.filter((row) => row.bar_id !== bar.bar_id));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : `Could not forget ${bar.bar_name}`);
     }
   };
 
@@ -294,6 +308,16 @@ export default function ProfileScreen() {
             />
           )}
         </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.label}>Frequently visited</Text>
+        <Text style={styles.fineprint}>Friends you accepted can see this list.</Text>
+        <TopBars
+          bars={topBars}
+          emptyLabel="Nowhere yet. Bars you check into show up here."
+          onForget={(bar) => void forget(bar)}
+        />
       </View>
 
       <View style={styles.section}>

@@ -38,7 +38,7 @@ NOTHING IS SHARED UNTIL YOU SAY SO
 Your phone notices when you've settled in somewhere that serves a drink and asks you first. Say yes and your friends see the venue. Ignore it and nothing happens. Being near a bar never checks you in by itself, so the pub under your office can't out you at 10am.
 
 YOUR LOCATION STAYS ON YOUR PHONE
-This is the part most apps get wrong. Your coordinates are never uploaded and never stored. Your device figures out which venue you're near by itself, and the only thing that ever reaches our servers is the name of the bar you confirmed. There's no location history, because there's nothing to keep.
+This is the part most apps get wrong. Your coordinates are never uploaded and never stored. Your device figures out which venue you're near by itself, and the only thing that ever reaches our servers is the name of the bar you confirmed. Those confirmed check-ins become the "frequently visited" list on your profile, which your friends can see and you can delete from at any time.
 
 FRIENDS ONLY, BY INVITATION
 Nobody can follow you. Send someone an invite link by text or email, and only after they accept can they see when you're out. Remove them and they lose it instantly.
@@ -84,14 +84,15 @@ Nothing is used for advertising, analytics or tracking.
 
 Note on Precise Location: coordinates are processed on the device and are never
 transmitted or stored. Only the identifier of a venue the user explicitly
-confirmed is stored, and only while they are there. Apple still requires
+confirmed is stored — as the current status while they are there, and as a
+check-in count shown to their accepted friends. Apple still requires
 declaring Precise Location because the app reads it on the device.
 
 ## App Review notes
 
 ```
 WHY THIS APP USES BACKGROUND LOCATION
-The app's single purpose is letting a user tell accepted friends that they are out at a bar. Background location is required to notice that the user has arrived somewhere: the device compares its position, on-device, against a catalog of bars, and after the user has remained within about 0.03 miles of one for three minutes it asks them to confirm. Coordinates are never transmitted to the server. Only the identifier of the venue the user confirms is stored, and it is cleared when they leave. The app has no ability to record or display a user's location at any other time.
+The app's single purpose is letting a user tell accepted friends that they are out at a bar. Background location is required to notice that the user has arrived somewhere: the device compares its position, on-device, against a catalog of bars, and after the user has remained within about 0.03 miles of one for three minutes it asks them to confirm. Coordinates are never transmitted to the server. Only the identifier of the venue the user confirms is stored: as the current status, which is cleared when they leave, and as a check-in record that feeds the "frequently visited" list on their profile, which the user can delete per venue. The app has no ability to record or display a user's location at any other time.
 
 HOW TO TEST
 Sign in with the demo account below. The Friends tab shows a seeded friend who is checked in at a venue; tapping them shows the venue and a map pin, which is the only location data any user can see about another. The You tab has "Check in now", which performs the location read immediately rather than waiting for the three-minute dwell, and shows the confirmation prompt. The Invite tab creates a shareable invite link.

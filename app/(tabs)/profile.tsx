@@ -45,6 +45,7 @@ export default function ProfileScreen() {
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [nothingNearby, setNothingNearby] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -67,6 +68,7 @@ export default function ProfileScreen() {
       setSharing(enabled);
       setPosts(drinks);
       setPending(status.bar ? null : prompt);
+      setNothingNearby(false);
       const [avatar, urls] = await Promise.all([
         signedAvatarUrl(me.avatar_url),
         signedDrinkUrls(drinks),
@@ -104,7 +106,10 @@ export default function ProfileScreen() {
 
       const point = await getCurrentPoint();
       const result = await syncStatusForLocation(point, { immediate: true });
+      const prompt = result.bar ? null : await getPendingVenue();
       setBar(result.bar);
+      setPending(prompt);
+      setNothingNearby(!result.bar && !prompt);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not enable sharing');
     } finally {
@@ -121,6 +126,8 @@ export default function ProfileScreen() {
       await stopBackgroundUpdates();
       await clearStatus();
       setBar(null);
+      setPending(null);
+      setNothingNearby(false);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not go offline');
     } finally {
@@ -195,8 +202,10 @@ export default function ProfileScreen() {
       // Asked for by hand, so it does not wait out the dwell the background
       // checks use.
       const result = await syncStatusForLocation(point, { immediate: true });
+      const prompt = result.bar ? null : await getPendingVenue();
       setBar(result.bar);
-      setPending(result.bar ? null : await getPendingVenue());
+      setPending(prompt);
+      setNothingNearby(!result.bar && !prompt);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not check your location');
     } finally {
@@ -308,6 +317,11 @@ export default function ProfileScreen() {
             />
           )}
         </View>
+        {nothingNearby ? (
+          <Text style={styles.fineprint}>
+            No bars, pubs or restaurants close enough to check into. Nothing was shared.
+          </Text>
+        ) : null}
       </View>
 
       <View style={styles.section}>

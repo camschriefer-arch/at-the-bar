@@ -4,7 +4,7 @@ title: At The Bar — Privacy Policy
 
 # Privacy Policy
 
-**Effective date: 30 August 2026**
+**Effective date: 9 September 2026**
 
 At The Bar ("the app") lets you share with friends you have accepted that you are
 out at a bar, pub or restaurant. This policy explains what the app collects, what
@@ -17,9 +17,11 @@ Contact: **cam.schriefer@gmail.com**
 - Your phone works out which venue you are at. Your coordinates are never sent to
   our servers and are never stored.
 - Nothing about where you are is shared until you tap to confirm you are there.
-- The only location fact we store is the identifier of the venue you confirmed,
-  and only while you are there. There is no location history.
-- Only friends whose request you accepted can see it.
+- The only location facts we store are the venues you confirmed you were at: the
+  current one, and a list of previous check-ins used to show which places you go
+  to most. Both are venue names from a public catalog, never coordinates.
+- You can delete any venue from that list, and it is only visible to friends you
+  accepted.
 - We do not sell your data, we do not share it with advertisers, and we do not
   track you across other apps or websites.
 
@@ -35,13 +37,14 @@ can notice when you arrive somewhere. Here is exactly what happens:
    there.
 3. If you say yes, the app sends **only the venue's identifier** to our server.
    If you say no, or ignore it, nothing is sent.
-4. When you move away from that venue, the app clears your status.
+4. When you move away from that venue, the app clears your status. The check-in
+   is kept as a visit, which is what "frequently visited" on your profile counts.
 
 Your latitude and longitude never leave your phone. Our database has no column
-that could hold them: the only location field on your account is a reference to a
-venue in the public catalog, plus the time you arrived. There is no way for us,
-or for your friends, to reconstruct where you have been — closing the app,
-tapping "Go offline", or revoking location permission stops the process entirely.
+that could hold them: every location field on your account is a reference to a
+venue in the public catalog, plus the time you arrived there. Closing the app,
+tapping "Go offline", or revoking location permission stops the process entirely,
+and nothing is ever recorded for a venue you did not confirm.
 
 ## What we store about you
 
@@ -50,6 +53,7 @@ tapping "Go offline", or revoking location permission stops the process entirely
 | Email address | Sign-in, and matching invites to accounts | You; anyone who already knows your address can use it to invite you |
 | Display name and profile photo | So friends recognise you | You and your accepted friends |
 | Current venue and arrival time | The core feature, only while you are checked in | You and your accepted friends |
+| Venues you checked into before, and when | The "frequently visited" list on your profile | You and your accepted friends |
 | Friends and pending invites | Deciding who may see your status | You and the person on the other side |
 | Drink photos, venue name, rating, notes | Your gallery | You and your accepted friends |
 | Push notification token | Sending you the "are you here?" prompt and letting friends know you are out | Us only |
@@ -59,7 +63,9 @@ they are not publicly addressable on the internet.
 
 ## What we never do
 
-- We never store your coordinates or any location history.
+- We never store your coordinates.
+- We never record a place you did not explicitly confirm, and we keep no trace of
+  anywhere that is not a venue in the public catalog.
 - We never share your location with anyone who is not an accepted friend.
 - We never show a friend where you are when you are not checked in — they only
   see that you are not out.
@@ -80,7 +86,10 @@ their own purposes.
 
 - **Stop sharing at any time**: tap "Go offline" in the app, or turn off location
   permission in your device settings.
-- **Remove a friend**: they immediately lose access to your status and photos.
+- **Forget a venue**: tap "Forget" next to any bar under "Frequently visited" on
+  your profile and every visit we hold for it is deleted.
+- **Remove a friend**: they immediately lose access to your status, visit history
+  and photos.
 - **Delete your account**: email **cam.schriefer@gmail.com** and we will delete
   your profile, status, friendships, invites and photos. Deleting your account
   removes everything associated with it; the venue catalog itself is public data

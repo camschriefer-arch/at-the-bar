@@ -1,4 +1,5 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors, spacing } from '../lib/theme';
 import type { TopBar } from '../lib/types';
@@ -10,10 +11,34 @@ type TopBarsProps = {
 };
 
 export function TopBars({ bars, emptyLabel, onForget }: TopBarsProps) {
+  const [editing, setEditing] = useState(false);
+
   if (bars.length === 0) return <Text style={styles.muted}>{emptyLabel}</Text>;
+
+  // Forgetting a bar deletes every visit and cannot be undone, so it takes a
+  // deliberate trip through Edit and a confirmation rather than one stray tap.
+  const confirmForget = (bar: TopBar) =>
+    Alert.alert(`Forget ${bar.bar_name}?`, 'This deletes your visits there. It cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: () => onForget?.(bar),
+      },
+    ]);
 
   return (
     <View style={styles.list}>
+      {onForget ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={editing ? 'Stop editing your bars' : 'Edit your bars'}
+          hitSlop={12}
+          style={styles.editRow}
+          onPress={() => setEditing((current) => !current)}>
+          <Text style={styles.edit}>{editing ? 'Done' : 'Edit'}</Text>
+        </Pressable>
+      ) : null}
       {bars.map((bar, index) => (
         <View key={bar.bar_id} style={styles.row}>
           <Text style={styles.rank}>{index + 1}</Text>
@@ -27,13 +52,13 @@ export function TopBars({ bars, emptyLabel, onForget }: TopBarsProps) {
                 .join(' · ')}
             </Text>
           </View>
-          {onForget ? (
+          {onForget && editing ? (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={`Forget ${bar.bar_name}`}
+              accessibilityLabel={`Remove ${bar.bar_name}`}
               hitSlop={12}
-              onPress={() => onForget(bar)}>
-              <Text style={styles.forget}>Forget</Text>
+              onPress={() => confirmForget(bar)}>
+              <Text style={styles.remove}>Remove</Text>
             </Pressable>
           ) : null}
         </View>
@@ -78,8 +103,16 @@ const styles = StyleSheet.create({
   muted: {
     color: colors.muted,
   },
-  forget: {
-    color: colors.muted,
+  editRow: {
+    alignSelf: 'flex-end',
+  },
+  edit: {
+    color: colors.accent,
     fontSize: 13,
+  },
+  remove: {
+    color: colors.danger,
+    fontSize: 13,
+    fontWeight: '600',
   },
 });

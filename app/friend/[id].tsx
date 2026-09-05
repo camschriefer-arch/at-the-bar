@@ -7,7 +7,8 @@ import { Avatar } from '../../components/Avatar';
 import { Button } from '../../components/Button';
 import { DrinkGallery } from '../../components/DrinkGallery';
 import { TopBars } from '../../components/TopBars';
-import { fetchFriendFeed, fetchTopBars, removeFriend } from '../../lib/api';
+import { fetchFriendFeed, fetchTopBars, isMuted, removeFriend, setMuted } from '../../lib/api';
+import { useAuth } from '../../lib/AuthProvider';
 import { fetchDrinkPosts, signedAvatarUrl, signedDrinkUrls } from '../../lib/photos';
 import { colors, spacing } from '../../lib/theme';
 import type { DrinkPost, FriendFeedRow, TopBar } from '../../lib/types';
@@ -17,12 +18,16 @@ const MAP_SPAN_DEGREES = 0.01;
 export default function FriendScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { session } = useAuth();
+  const userId = session?.user.id;
   const [friend, setFriend] = useState<FriendFeedRow | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [posts, setPosts] = useState<DrinkPost[]>([]);
   const [topBars, setTopBars] = useState<TopBar[]>([]);
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
+  const [muted, setMutedState] = useState(false);
+  const [muting, setMuting] = useState(false);
   const [removing, setRemoving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,12 +41,14 @@ export default function FriendScreen() {
       if (!row) return;
 
       // Only reachable for an accepted friend; the database enforces the same rule.
-      const [drinks, frequented] = await Promise.all([
+      const [drinks, frequented, silenced] = await Promise.all([
         fetchDrinkPosts(row.friend_id),
         fetchTopBars(row.friend_id),
+        isMuted(row.friend_id),
       ]);
       setPosts(drinks);
       setTopBars(frequented);
+      setMutedState(silenced);
       const [avatar, urls] = await Promise.all([
         signedAvatarUrl(row.avatar_url),
         signedDrinkUrls(drinks),
@@ -69,6 +76,20 @@ export default function FriendScreen() {
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : `Could not remove ${name}`);
       setRemoving(false);
+    }
+  };
+
+  const toggleMute = async () => {
+    if (!userId) return;
+    setMuting(true);
+    try {
+      await setMuted(userId, id, !muted);
+      setMutedState(!muted);
+      setError(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not change notifications');
+    } finally {
+      setMuting(false);
     }
   };
 
@@ -167,6 +188,17 @@ export default function FriendScreen() {
       </View>
 
       <View style={styles.footer}>
+        <Text style={styles.muted}>
+          {muted
+            ? `Notifications from ${friend.display_name} are off. You can still see them here.`
+            : `You get a notification when ${friend.display_name} arrives at or leaves a bar.`}
+        </Text>
+        <Button
+          title={muted ? 'Unmute notifications' : 'Mute notifications'}
+          variant="secondary"
+          loading={muting}
+          onPress={() => void toggleMute()}
+        />
         <Button
           title="Remove friend"
           variant="secondary"
@@ -207,6 +239,7 @@ const styles = StyleSheet.create({
     padding: spacing.md,
   },
   footer: {
+    gap: spacing.sm,
     padding: spacing.md,
   },
   name: {

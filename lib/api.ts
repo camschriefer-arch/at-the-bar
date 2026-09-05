@@ -98,6 +98,28 @@ export async function forgetBar(barId: string): Promise<void> {
   if (error) throw error;
 }
 
+/** Whether this user has silenced a friend's arrive/leave notifications. */
+export async function isMuted(friendId: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('notification_mutes')
+    .select('muted_id')
+    .eq('muted_id', friendId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data !== null;
+}
+
+export async function setMuted(userId: string, friendId: string, muted: boolean): Promise<void> {
+  const { error } = muted
+    ? await supabase
+        .from('notification_mutes')
+        .upsert({ muter_id: userId, muted_id: friendId })
+    : await supabase.from('notification_mutes').delete().eq('muted_id', friendId);
+
+  if (error) throw error;
+}
+
 /**
  * Ends the friendship both ways. The database queues an email to the person who
  * was removed — deliberately not a push, which is reserved for bar events — and

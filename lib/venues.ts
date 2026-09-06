@@ -2,7 +2,7 @@ import { allWithin, AT_BAR_RADIUS_METERS, nearestWithin, type LatLng } from './g
 import type { Bar } from './types';
 
 /**
- * A user has to get within 0.03 mi to check in but only drops off the map past
+ * A user has to get within 0.1 mi to check in but only drops off the map past
  * 0.045 mi, so GPS jitter at the edge of a bar does not flap the status.
  */
 export const LEAVE_RADIUS_METERS = AT_BAR_RADIUS_METERS * 1.5;

@@ -1,4 +1,9 @@
-export const AT_BAR_RADIUS_MILES = 0.03;
+/**
+ * Wide enough to absorb the GPS error a phone has indoors, which is tens of
+ * metres on its own. Nothing is shared without the user confirming, so a venue
+ * offered from across the street costs them a dismissal, not their privacy.
+ */
+export const AT_BAR_RADIUS_MILES = 0.1;
 export const AT_BAR_RADIUS_METERS = AT_BAR_RADIUS_MILES * 1609.344;
 
 /**

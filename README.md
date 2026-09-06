@@ -25,7 +25,7 @@ Your coordinates never leave your device. The app downloads the venues for a coa
 | Location | `expo-location` foreground + background updates, `expo-task-manager` |
 | Maps | `react-native-maps` with Google Maps on both platforms |
 | Backend | Supabase: Postgres + PostGIS, auth, row level security |
-| Venue catalog | OpenStreetMap `amenity=bar|pub|restaurant`, imported per state |
+| Venue catalog | [Overture Maps](https://overturemaps.org) places, imported nationwide with DuckDB |
 | Push | `expo-notifications` + Expo Push Service, fanned out by the `send-push` edge function |
 | Photos | `expo-image-picker` + private Supabase Storage buckets, rendered from signed URLs with `expo-image` |
 
@@ -47,17 +47,17 @@ Your coordinates never leave your device. The app downloads the venues for a coa
    npm install
    ```
 
-3. Load the venue catalog (Overpass is rate limited, so start with a couple of states):
+3. Load the venue catalog:
 
    ```sh
-   SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... npm run import-bars -- --states TX,NY
-   SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... npm run import-bars   # all 50 states + DC
-   SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... npm run import-bars -- --categories restaurant
+   pip install duckdb
+   SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... python3 scripts/import_places.py --states MA,NY
+   SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... python3 scripts/import_places.py   # 50 states + DC
    ```
 
-   The import is idempotent (keyed on the OSM id), so re-running it only refreshes rows.
+   Venues come from the newest [Overture Maps](https://overturemaps.org) release, queried straight off S3 as GeoParquet — about 350k US bars, pubs and restaurants. The import is idempotent (keyed on `source, source_id`), so re-running it only refreshes rows. A full run also calls `prune_unused_osm_bars()` to drop the OpenStreetMap rows Overture replaced, keeping any that a check-in or a drink photo still points at; pass `--keep-osm` to skip that.
 
-   Production keeps itself current: [`.github/workflows/refresh-venues.yml`](.github/workflows/refresh-venues.yml) re-imports every state at 04:00 UTC on the 1st of each month, in chunks so no job runs for hours. It needs the repository secrets `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, and can be run by hand (optionally for a few states) from the Actions tab.
+   Production keeps itself current: [`.github/workflows/refresh-venues.yml`](.github/workflows/refresh-venues.yml) re-imports the country at 04:00 UTC on the 1st of each month. It needs the repository secrets `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, and can be run by hand (optionally for a few states) from the Actions tab.
 
 4. Run it. Background location needs a development build, not Expo Go:
 
@@ -98,7 +98,7 @@ $$);
 
 Profile pictures live in the `avatars` bucket and drink photos in `drinks`, both private. Objects are stored as `<user id>/<timestamp>.<ext>`, and the storage policies read that prefix: you may write only under your own id, and an object is readable by its owner and their accepted friends — the same rule as `drink_posts` rows. The client never holds a public URL; it mints a one-hour signed URL per image.
 
-`drink_posts` keeps a snapshot of the bar name alongside the optional `bar_id`, because the catalog is reimported from OpenStreetMap and a bar can vanish from it while the photo should not. Ratings are constrained to 1–5 in the database.
+`drink_posts` keeps a snapshot of the bar name alongside the optional `bar_id`, because the catalog is reimported from Overture and a bar can vanish from it while the photo should not. Ratings are constrained to 1–5 in the database.
 
 The bar field autocompletes against the catalog: bars from the cached tile around the device rank first (closest first, with the distance shown), then name matches from anywhere in the country, and a name that has no catalog entry can still be typed in freely. Only the typed text is sent for the country-wide search — the device's position never leaves it.
 

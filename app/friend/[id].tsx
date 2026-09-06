@@ -44,7 +44,9 @@ export default function FriendScreen() {
       const [drinks, frequented, silenced] = await Promise.all([
         fetchDrinkPosts(row.friend_id),
         fetchTopBars(row.friend_id),
-        isMuted(row.friend_id),
+        // Whether they are muted is the least of what this screen is for, so it
+        // never costs the whole profile.
+        isMuted(row.friend_id).catch(() => false),
       ]);
       setPosts(drinks);
       setTopBars(frequented);

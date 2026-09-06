@@ -76,6 +76,9 @@ function RootNavigator() {
       screenOptions={{
         headerStyle: { backgroundColor: colors.background },
         headerTintColor: colors.text,
+        // Without this iOS labels the button with the previous route's name,
+        // which is the tab group's own "(tabs)".
+        headerBackTitle: 'Back',
         contentStyle: { backgroundColor: colors.background },
       }}>
       <Stack.Screen name="(auth)" options={{ headerShown: false }} />

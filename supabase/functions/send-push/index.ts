@@ -10,14 +10,21 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
 
 const EXPO_PUSH_ENDPOINT = 'https://exp.host/--/api/v2/push/send';
 const BATCH_SIZE = 100;
+const DRINK_BUCKET = 'drinks';
+// Long enough that a phone which was off when the push was sent still renders
+// the thumbnail, short enough that the link is not a lasting handle on a
+// private object.
+const IMAGE_URL_TTL_SECONDS = 60 * 60 * 24;
 
 type OutboxRow = {
   id: number;
   recipient_id: string;
   actor_id: string;
-  event: 'arrived' | 'left';
+  event: 'arrived' | 'left' | 'posted';
   body: string;
   token: string;
+  post_id: string | null;
+  image_path: string | null;
 };
 
 type ExpoTicket = {
@@ -48,17 +55,36 @@ Deno.serve(async (request: Request) => {
   const rows = (data ?? []) as OutboxRow[];
   if (rows.length === 0) return json({ sent: 0 }, 200);
 
-  const messages = rows.map((row) => ({
-    to: row.token,
-    title: 'At The Bar',
-    body: row.body,
-    sound: 'default',
-    channelId: 'bar-events',
-    priority: 'high',
-    // The tap handler opens the friend, who is only rendered if the viewer is
-    // still allowed to see them, so no bar detail travels in the payload.
-    data: { friendId: row.actor_id, event: row.event },
-  }));
+  // The drinks bucket is private, so the photo travels as a short-lived signed
+  // URL. A failure to sign only costs the preview, not the notification.
+  const imageUrls = new Map<string, string>();
+  await Promise.all(
+    [...new Set(rows.map((row) => row.image_path).filter((path): path is string => !!path))].map(
+      async (path) => {
+        const { data: signed } = await supabase.storage
+          .from(DRINK_BUCKET)
+          .createSignedUrl(path, IMAGE_URL_TTL_SECONDS);
+        if (signed?.signedUrl) imageUrls.set(path, signed.signedUrl);
+      }
+    )
+  );
+
+  const messages = rows.map((row) => {
+    const image = row.image_path ? imageUrls.get(row.image_path) : undefined;
+
+    return {
+      to: row.token,
+      title: 'At The Bar',
+      body: row.body,
+      sound: 'default',
+      channelId: 'bar-events',
+      priority: 'high',
+      ...(image ? { richContent: { image }, mutableContent: true } : {}),
+      // The tap handler opens the friend, who is only rendered if the viewer is
+      // still allowed to see them, so the payload carries no bar of its own.
+      data: { friendId: row.actor_id, event: row.event, postId: row.post_id ?? undefined },
+    };
+  });
 
   const response = await fetch(EXPO_PUSH_ENDPOINT, {
     method: 'POST',

@@ -13,7 +13,7 @@ import { checkInAt } from '../lib/statusSync';
 import { colors } from '../lib/theme';
 import { clearPendingVenue, VENUE_PROMPT_CONFIRM, VENUE_PROMPT_DISMISS } from '../lib/venuePrompt';
 
-type BarEventPayload = { friendId?: string; kind?: string; barId?: string };
+type BarEventPayload = { friendId?: string; kind?: string; barId?: string; postId?: string };
 
 function RootNavigator() {
   const { session, loading } = useAuth();
@@ -64,9 +64,12 @@ function RootNavigator() {
   useEffect(() => {
     if (!session || !tapped) return;
 
-    const { friendId, kind, barId } = tapped.notification.request.content.data as BarEventPayload;
+    const { friendId, kind, barId, postId } = tapped.notification.request.content
+      .data as BarEventPayload;
     if (friendId) {
-      router.push(`/friend/${friendId}`);
+      // A drink post opens on the photo it announced; everything else opens the
+      // gallery as it stands.
+      router.push(postId ? `/friend/${friendId}?post=${postId}` : `/friend/${friendId}`);
       return;
     }
 

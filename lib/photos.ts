@@ -1,6 +1,7 @@
 import { File } from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 
+import { flushPendingNotifications } from './notifications';
 import { supabase } from './supabase';
 import type { DrinkPost, DrinkPostDraft } from './types';
 
@@ -142,6 +143,10 @@ export async function createDrinkPost(
     await supabase.storage.from(DRINK_BUCKET).remove([imagePath]);
     throw error;
   }
+
+  // The trigger has queued a push for every friend who has not muted you; this
+  // only saves them waiting for the next cron sweep.
+  await flushPendingNotifications();
 
   return data as DrinkPost;
 }

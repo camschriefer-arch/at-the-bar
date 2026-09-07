@@ -20,13 +20,29 @@ type DrinkGalleryProps = {
   /** Signed URL per image path — the drinks bucket is private. */
   urls: Record<string, string>;
   emptyLabel: string;
+  /** Post to show full screen straight away, e.g. the one a push announced. */
+  showPostId?: string | null;
   onDelete?: (post: DrinkPost) => void;
 };
 
-export function DrinkGallery({ posts, urls, emptyLabel, onDelete }: DrinkGalleryProps) {
+export function DrinkGallery({
+  posts,
+  urls,
+  emptyLabel,
+  showPostId,
+  onDelete,
+}: DrinkGalleryProps) {
   const [openId, setOpenId] = useState<string | null>(null);
-  const open = posts.find((post) => post.id === openId) ?? null;
+  const [requested, setRequested] = useState<string | null>(null);
   const insets = useSafeAreaInsets();
+
+  // Honoured once per requested post, so closing the photo does not reopen it.
+  if (showPostId && showPostId !== requested) {
+    setRequested(showPostId);
+    setOpenId(showPostId);
+  }
+
+  const open = posts.find((post) => post.id === openId) ?? null;
 
   if (posts.length === 0) {
     return <Text style={styles.muted}>{emptyLabel}</Text>;

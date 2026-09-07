@@ -26,6 +26,7 @@ import xml.etree.ElementTree as ElementTree
 
 BUCKET = "overturemaps-us-west-2"
 BATCH_SIZE = 500
+PRUNE_BATCH_SIZE = 2000
 RETRY_DELAYS_SECONDS = [5, 15, 30, 60, 120]
 
 STATES = [
@@ -168,7 +169,7 @@ def rows_for(release: str, states: list[str]):
             yield rows
 
 
-def post(url: str, key: str, body: object, prefer: str) -> None:
+def post(url: str, key: str, body: object, prefer: str) -> str:
     request = urllib.request.Request(
         url,
         data=json.dumps(body).encode(),
@@ -184,8 +185,7 @@ def post(url: str, key: str, body: object, prefer: str) -> None:
     for attempt in range(len(RETRY_DELAYS_SECONDS) + 1):
         try:
             with urllib.request.urlopen(request, timeout=120) as response:
-                response.read()
-                return
+                return response.read().decode(errors="replace")
         except urllib.error.HTTPError as error:
             detail = error.read().decode(errors="replace")
             # 4xx is a bad payload and will not fix itself.
@@ -244,8 +244,19 @@ def main() -> None:
         print(f"Imported {total} venues, left the OSM rows alone.")
         return
 
-    post(f"{url.rstrip('/')}/rest/v1/rpc/prune_unused_osm_bars", key, {}, "return=minimal")
-    print(f"Imported {total} venues and pruned the replaced OSM rows.")
+    # One statement deleting every replaced OSM row runs past the database's
+    # statement timeout, so walk it a batch at a time until nothing is left.
+    prune_url = f"{url.rstrip('/')}/rest/v1/rpc/prune_unused_osm_bars"
+    pruned = 0
+    while True:
+        removed = int(post(prune_url, key, {"batch_size": PRUNE_BATCH_SIZE}, "return=representation"))
+        if removed == 0:
+            break
+        pruned += removed
+        print(f"\rpruned {pruned} OSM rows", end="", flush=True)
+
+    print()
+    print(f"Imported {total} venues and pruned {pruned} replaced OSM rows.")
 
 
 if __name__ == "__main__":

@@ -10,6 +10,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.camschriefer.atthebar",
+      "appleTeamId": "5JBUFPFS72",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -55,7 +56,8 @@
           "isAndroidBackgroundLocationEnabled": true,
           "isAndroidForegroundServiceEnabled": true
         }
-      ]
+      ],
+      "@bacons/apple-targets"
     ],
     "experiments": {
       "typedRoutes": true

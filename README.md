@@ -80,7 +80,7 @@ A drink post queues the same way, minus anyone who muted the poster, and names t
 
 The `send-push` function drains that queue through the Expo Push Service. It claims rows rather than deleting them, so a failed send retries and a check-in is never lost or duplicated.
 
-Android renders the preview image out of the box. iOS only renders it once the app has a [Notification Service Extension](https://github.com/expo/expo/pull/36202) target; without one the push still arrives as text and still opens the photo.
+Android renders the preview image out of the box. iOS ignores it unless a Notification Service Extension intercepts the push and attaches the file itself, so `targets/notification-service` adds one: `@bacons/apple-targets` links that directory as a second Xcode target during `expo prebuild`, and the Swift there downloads `body._richContent.image` and re-attaches it, falling back to the plain text push if the signed URL has expired or the download runs out of time. The extension ships with the app build, so a device only shows previews once it installs a build that contains it.
 
 ```sh
 eas init                        # push tokens need an EAS project id

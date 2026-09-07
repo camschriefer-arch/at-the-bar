@@ -4,9 +4,25 @@ import { BACKGROUND_LOCATION_TASK } from './backgroundLocationTask';
 
 export type PermissionLevel = 'denied' | 'foreground' | 'background';
 
+// iOS shows the "Change to Always?" upgrade dialog only once the When In Use
+// one has closed; asking in the same tick loses it.
+const ALWAYS_PROMPT_DELAY_MS = 700;
+
 export async function requestLocationPermissions(): Promise<PermissionLevel> {
   const foreground = await Location.requestForegroundPermissionsAsync();
   if (foreground.status !== 'granted') return 'denied';
+
+  return requestAlwaysPermission();
+}
+
+/**
+ * Asks iOS to upgrade When In Use to Always. Returns 'foreground' when the
+ * system refused to ask — after "Allow Once", or once the one-time upgrade
+ * prompt has been answered, the request fails silently and Settings is the
+ * only way left.
+ */
+export async function requestAlwaysPermission(): Promise<PermissionLevel> {
+  await new Promise((resolve) => setTimeout(resolve, ALWAYS_PROMPT_DELAY_MS));
 
   const background = await Location.requestBackgroundPermissionsAsync();
   return background.status === 'granted' ? 'background' : 'foreground';

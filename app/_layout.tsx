@@ -6,7 +6,9 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AuthProvider, useAuth } from '../lib/AuthProvider';
+import { getPermissionLevel } from '../lib/locationService';
 import { registerForPushNotifications } from '../lib/notifications';
+import { hasSeenLocationIntro } from '../lib/onboarding';
 import { checkInAt } from '../lib/statusSync';
 import { colors } from '../lib/theme';
 import { clearPendingVenue, VENUE_PROMPT_CONFIRM, VENUE_PROMPT_DISMISS } from '../lib/venuePrompt';
@@ -34,6 +36,27 @@ function RootNavigator() {
     // A refused permission is a normal outcome; the rest of the app works.
     registerForPushNotifications().catch(() => undefined);
   }, [session]);
+
+  // iOS never offers Always in its first dialog and only allows one upgrade
+  // prompt per install, so the explainer runs before either of them.
+  useEffect(() => {
+    if (!session) return;
+
+    let stale = false;
+    void (async () => {
+      try {
+        const [seen, level] = await Promise.all([hasSeenLocationIntro(), getPermissionLevel()]);
+        if (stale || seen || level === 'background') return;
+        router.replace('/location-access');
+      } catch {
+        // The explainer is a nicety; failing to read it must not block the app.
+      }
+    })();
+
+    return () => {
+      stale = true;
+    };
+  }, [session, router]);
 
   // "Bob is at the bar" says nothing about where; tapping it opens Bob, which
   // only renders his bar if the friendship still allows it.
@@ -83,6 +106,7 @@ function RootNavigator() {
       }}>
       <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="location-access" options={{ headerShown: false }} />
       <Stack.Screen name="friend/[id]" options={{ title: 'Friend' }} />
       <Stack.Screen name="redeem" options={{ title: 'Invite' }} />
     </Stack>

@@ -1,6 +1,6 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Avatar } from '../../components/Avatar';
 import { Button } from '../../components/Button';
@@ -12,6 +12,7 @@ import { useAuth } from '../../lib/AuthProvider';
 import {
   getPermissionLevel,
   getCurrentPoint,
+  requestAlwaysPermission,
   requestLocationPermissions,
   startBackgroundUpdates,
   stopBackgroundUpdates,
@@ -67,6 +68,8 @@ export default function ProfileScreen() {
       setPermission(level);
       setSharing(enabled);
       setPosts(drinks);
+      // Always may have been granted from Settings while the app was away.
+      if (level === 'background' && enabled) await startBackgroundUpdates();
       setPending(status.bar ? null : prompt);
       setNothingNearby(false);
       const [avatar, urls] = await Promise.all([
@@ -112,6 +115,28 @@ export default function ProfileScreen() {
       setNothingNearby(!result.bar && !prompt);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not enable sharing');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const allowAlways = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const level = await requestAlwaysPermission();
+      setPermission(level);
+
+      if (level === 'background') {
+        if (sharing) await startBackgroundUpdates();
+        return;
+      }
+
+      // iOS only ever offers the upgrade dialog once, so a refusal to ask is
+      // indistinguishable from a No: send the user where they can still say yes.
+      await Linking.openSettings();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not ask for Always');
     } finally {
       setBusy(false);
     }
@@ -293,7 +318,7 @@ export default function ProfileScreen() {
               ? 'Offline. Your location is not being read at all.'
               : permission === 'background'
                 ? 'On, including in the background.'
-                : 'On while the app is open. Allow "Always" to update in the background.'}
+                : 'On while the app is open. Allow "Always" so we can check you in while your phone is in your pocket.'}
         </Text>
         <Text style={styles.fineprint}>
           Your coordinates stay on your phone. Only the bar you are at is stored, and only friends
@@ -306,6 +331,9 @@ export default function ProfileScreen() {
             loading={busy}
             disabled={permission !== 'denied' && !sharing}
           />
+          {permission === 'foreground' ? (
+            <Button title="Allow Always" onPress={allowAlways} disabled={busy} />
+          ) : null}
           {sharing ? (
             <Button title="Go offline" variant="secondary" onPress={goOffline} disabled={busy} />
           ) : (

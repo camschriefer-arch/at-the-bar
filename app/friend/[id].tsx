@@ -126,7 +126,7 @@ export default function FriendScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Stack.Screen options={{ title: friend.display_name }} />
+      <Stack.Screen options={{ title: friend.display_name, headerBackTitle: 'Back' }} />
 
       <View style={styles.header}>
         <Avatar uri={avatarUrl} name={friend.display_name} />

@@ -108,9 +108,13 @@ function RootNavigator() {
         contentStyle: { backgroundColor: colors.background },
       }}>
       <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      {/* iOS takes the back label from the previous screen's title when a screen
+          does not carry headerBackTitle of its own, and the group's route name
+          is "(tabs)". The header here is hidden, so the title is only ever read
+          as that label. */}
+      <Stack.Screen name="(tabs)" options={{ headerShown: false, title: 'Back' }} />
       <Stack.Screen name="location-access" options={{ headerShown: false }} />
-      <Stack.Screen name="friend/[id]" options={{ title: 'Friend' }} />
+      <Stack.Screen name="friend/[id]" options={{ title: 'Friend', headerBackTitle: 'Back' }} />
       <Stack.Screen name="redeem" options={{ title: 'Invite' }} />
     </Stack>
   );

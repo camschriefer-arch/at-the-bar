@@ -21,8 +21,8 @@ for the emulator. Everything below is driven with `adb` and `uiautomator`; evide
      (`EXPO_PUBLIC_SUPABASE_URL`), otherwise every request fails silently-ish.
    - `psql` may not be installed on the host; use
      `docker exec supabase_db_<project> psql -U postgres -d postgres -c "..."`.
-3. Seed a couple of bars directly with SQL instead of running `npm run import-bars`
-   (Overpass is slow/rate-limited).
+3. Seed a couple of bars directly with SQL instead of running `python3 scripts/import_places.py`
+   (a real import scans the national Overture release).
 4. Emulator: `sudo -n chmod 666 /dev/kvm` may be needed. Launch headless:
    `emulator -avd <avd> -no-snapshot -no-audio -no-window -gpu swiftshader_indirect -memory 2048 -no-boot-anim`.
 5. Memory is tight (~8 GB total). Gradle + emulator concurrently WILL OOM-kill the
@@ -84,6 +84,10 @@ otherwise you get "Current location is unavailable. Make sure that location serv
   `sudo tcpdump -i lo -A -s0 'tcp port 54321' -w cap.pcap`, then grep the bodies. Expect only
   `bars_in_bbox` with rounded tile bounds and `set_current_bar` with a bar UUID or null.
 - DB check: `select table_name, column_name from information_schema.columns where table_schema='public' and column_name ~* 'lat|lng|coord|geo'` — coordinates should exist only on `bars`.
+- Prove "a non-friend sees nothing" with per-user JWTs, never the service role: password-grant
+  each account against `/auth/v1/token?grant_type=password` and call PostgREST/RPC with that
+  bearer. Always pair the negative with a positive control from an accepted friend's JWT,
+  otherwise an empty result only proves the table is empty.
 
 ## Google Maps on the emulator
 
@@ -108,6 +112,24 @@ That is a key-restriction/environment issue, not an app bug.
   Supabase grants EXECUTE to `anon`/`authenticated` by default, so `revoke ... from public`
   in a migration does NOT lock a function down — the revoke must name `anon, authenticated`.
   Test by calling the RPC through PostgREST with only the anon key.
+
+## Account switching and in-progress visits (mute / notification tests)
+
+- There is only one emulator, so multi-account flows are done with Sign out / Sign in. **Signing
+  out also checks the user out**: it clears `user_status.bar_id` and therefore fires a `left`
+  event into `notification_outbox`. Never assume a user stays "at the bar" across an account
+  switch — re-read `select user_id, bar_id from user_status` after every sign-out.
+- To test something that must happen *mid-visit* (e.g. "a mute placed while the friend is already
+  checked in must suppress the later leave"), re-establish the visit with the actor's **own**
+  password-grant JWT (never the service role):
+  `POST /rest/v1/rpc/set_current_bar {"p_bar_id":"<uuid>"}` with `Authorization: Bearer <jwt>`.
+  This fires a normal `arrived` event and the app shows "At the bar" again after the actor signs
+  back in, so the subsequent "Go offline" tap in the UI is a genuine leave transition.
+- Prove suppression with a positive control: keep a second accepted friend who never mutes, and
+  assert the outbox has rows for the control and zero for the muter for the same transition.
+- Mute/RLS privacy is best proven with per-user JWTs against PostgREST: the muted user's token must
+  return `[]` from `/rest/v1/notification_mutes` (and a `DELETE` with their token returns 204 while
+  deleting nothing), while the muter's token returns the row.
 
 ## Photos / storage (avatars + drink gallery) testing
 
@@ -161,6 +183,15 @@ To test friend-detail UI, re-set the other user's status with service-role SQL:
   with the user's own JWT before reporting the UI text as the backend behaviour.
 
 ## Test-account and evidence gotchas
+
+- After `supabase db reset`, the app still holds venue UUIDs from the old catalog and check-in
+  fails with the generic "Could not check you in" (Kong logs a 400 from `set_current_bar`).
+  `adb shell pm clear com.atthebar.app`, re-grant location/notification permissions, sign in again.
+- Never delete `user_status` rows when seeding: the profile screen reads it with `.single()` and
+  an absent row renders "Could not load your profile".
+- `screenrecord` cannot encode the 1290x2796 AVD (`unable to configure video/avc codec`) — pass
+  `--size 720x1280`. Pull the file only after the recorder process has exited, or the mp4 has no
+  `moov` atom and is unplayable.
 
 - Passwords for previously created local accounts are easy to lose; reset with the admin API:
   `curl -X PUT $API/auth/v1/admin/users/<uid> -H "apikey: $SERVICE_ROLE" -H "Authorization: Bearer $SERVICE_ROLE" -d '{"password":"..."}'`.

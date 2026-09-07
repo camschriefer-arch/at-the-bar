@@ -16,7 +16,7 @@ import type { DrinkPost, FriendFeedRow, TopBar } from '../../lib/types';
 const MAP_SPAN_DEGREES = 0.01;
 
 export default function FriendScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, post } = useLocalSearchParams<{ id: string; post?: string }>();
   const router = useRouter();
   const { session } = useAuth();
   const userId = session?.user.id;
@@ -185,6 +185,7 @@ export default function FriendScreen() {
         <DrinkGallery
           posts={posts}
           urls={photoUrls}
+          showPostId={post}
           emptyLabel={`${friend.display_name} has not posted any drinks yet.`}
         />
       </View>

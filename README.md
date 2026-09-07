@@ -7,6 +7,7 @@ iOS + Android app that shows which of your friends are out at a bar right now, a
 - Leaving is automatic: walk away and the status clears itself.
 - Friends who accepted your request see that status and, on your profile, a map pin on the bar.
 - Friends get a push notification when you arrive at or leave a bar ("Bob is at the bar"), naming you but not the bar.
+- Posting a drink pushes "Check out Bob's latest beer post at Jake & Joe's!" to the same friends, with the photo as a preview; tapping it opens that photo on Bob's profile.
 - Removing a friend cuts the tie both ways; they get an email about it, never a push.
 - Your profile carries a photo of you and a gallery of the drinks you post (bar, drink, note, 1–5 stars), which accepted friends browse from your friend screen.
 - When you are not at a bar, friends see nothing at all.
@@ -75,7 +76,11 @@ Your coordinates never leave your device. The app downloads the venues for a coa
 
 A trigger on `user_status` queues one `notification_outbox` row per accepted friend whenever a user's `bar_id` goes from null to a bar ("arrived") or back ("left"); moving between two bars queues nothing, since the status is unchanged. The body names the person only — the bar is revealed when the friend taps through and passes the same RLS checks as the friends list.
 
+A drink post queues the same way, minus anyone who muted the poster, and names the venue: the post carries it to the same audience anyway. Its outbox row points at the post rather than the photo, because the drinks bucket is private — `send-push` signs a 24 hour URL at delivery time and sends it as `richContent.image`, and deleting the post cascades away any notification still waiting to go out.
+
 The `send-push` function drains that queue through the Expo Push Service. It claims rows rather than deleting them, so a failed send retries and a check-in is never lost or duplicated.
+
+Android renders the preview image out of the box. iOS only renders it once the app has a [Notification Service Extension](https://github.com/expo/expo/pull/36202) target; without one the push still arrives as text and still opens the photo.
 
 ```sh
 eas init                        # push tokens need an EAS project id

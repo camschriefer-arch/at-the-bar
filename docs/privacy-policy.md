@@ -32,7 +32,7 @@ can notice when you arrive somewhere. Here is exactly what happens:
 
 1. Your device reads your location and compares it, **on the device**, against a
    catalog of venues downloaded from OpenStreetMap.
-2. If you have stayed within about 0.03 miles of a venue for three minutes, the
+2. If you have stayed within about 0.1 miles of a venue for three minutes, the
    app asks you — with a notification or a prompt in the app — whether you are
    there.
 3. If you say yes, the app sends **only the venue's identifier** to our server.

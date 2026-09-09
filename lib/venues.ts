@@ -30,22 +30,28 @@ export function stillAt(
  */
 export const DWELL_MS = 3 * 60 * 1000;
 
-export type Sighting = { barId: string; since: number };
+/** When each venue currently in range was first seen. */
+export type Sighting = Record<string, number>;
 
 /**
- * Folds a sighting of `barId` into what we knew, and says whether the user has
- * now been there long enough. Moving to a different venue restarts the clock.
+ * Folds a sighting of `barIds` into what we knew, and says whether any one of
+ * them has been in range long enough. Each venue keeps its own clock: which
+ * venues are in range flips with GPS jitter, and a shared clock would restart
+ * every time a neighbour drifted in or out.
  */
 export function noteSighting(
   previous: Sighting | null,
-  barId: string,
+  barIds: readonly string[],
   now: number
 ): { sighting: Sighting; dwelled: boolean } {
-  if (!previous || previous.barId !== barId || previous.since > now) {
-    return { sighting: { barId, since: now }, dwelled: false };
+  const sighting: Sighting = {};
+  for (const barId of barIds) {
+    const since = previous?.[barId];
+    sighting[barId] = since !== undefined && since <= now ? since : now;
   }
 
-  return { sighting: previous, dwelled: now - previous.since >= DWELL_MS };
+  const dwelled = Object.values(sighting).some((since) => now - since >= DWELL_MS);
+  return { sighting, dwelled };
 }
 
 /**
@@ -57,16 +63,4 @@ export const MAX_CHOICES = 5;
 /** The venues close enough to be worth asking the user about, nearest first. */
 export function venuesToConfirm(point: LatLng, venues: readonly Bar[]): Bar[] {
   return allWithin(point, venues).slice(0, MAX_CHOICES);
-}
-
-/**
- * Key for the dwell clock over a set of venues. Which of two neighbouring bars
- * is nearest flips with GPS jitter, so keying on the nearest one alone would
- * keep restarting the clock; the set as a whole is what has to stay put.
- */
-export function sightingKey(venues: readonly Bar[]): string {
-  return venues
-    .map((venue) => venue.id)
-    .sort()
-    .join(',');
 }

@@ -4,7 +4,7 @@ import { barsNear } from './barCache';
 import { type LatLng } from './geo';
 import { flushPendingNotifications } from './notifications';
 import { supabase } from './supabase';
-import { noteSighting, sightingKey, stillAt, venuesToConfirm, type Sighting } from './venues';
+import { noteSighting, stillAt, venuesToConfirm, type Sighting } from './venues';
 import { clearPendingVenue, promptForVenues } from './venuePrompt';
 import type { Bar } from './types';
 
@@ -24,9 +24,9 @@ async function readSighting(): Promise<Sighting | null> {
   }
 }
 
-/** Whether the user has been at `key` long enough for it to count. */
-async function hasDwelled(key: string): Promise<boolean> {
-  const { sighting, dwelled } = noteSighting(await readSighting(), key, Date.now());
+/** Whether the user has been near one of `barIds` long enough for it to count. */
+async function hasDwelled(barIds: readonly string[]): Promise<boolean> {
+  const { sighting, dwelled } = noteSighting(await readSighting(), barIds, Date.now());
   await AsyncStorage.setItem(SIGHTING_KEY, JSON.stringify(sighting));
   return dwelled;
 }
@@ -75,7 +75,7 @@ export async function syncStatusForLocation(
     return { bar: null, changed: left };
   }
 
-  if (immediate || (await hasDwelled(sightingKey(candidates)))) {
+  if (immediate || (await hasDwelled(candidates.map((venue) => venue.id)))) {
     await promptForVenues(candidates, { force: immediate });
   }
 

@@ -85,15 +85,20 @@ export async function wasRecentlyPrompted(barId: string): Promise<boolean> {
  * status on its own, so an answered prompt is the only way one becomes a
  * check-in. Several venues in range get one notification rather than one each:
  * the phone cannot tell which of two adjacent bars you are in, so the user
- * picks from a list in the app. `force` re-asks inside the cooldown, for a
- * prompt the user asked for by hand.
+ * picks from a list in the app. Venues already asked about are dropped from
+ * the list rather than silencing it: a bar down the street from one you were
+ * asked about earlier is a new visit. `force` re-asks inside the cooldown, for
+ * a prompt the user asked for by hand.
  */
-export async function promptForVenues(bars: readonly Bar[], { force = false } = {}): Promise<void> {
+export async function promptForVenues(
+  candidates: readonly Bar[],
+  { force = false } = {}
+): Promise<void> {
+  const recent = force
+    ? candidates.map(() => false)
+    : await Promise.all(candidates.map((bar) => wasRecentlyPrompted(bar.id)));
+  const bars = candidates.filter((_, index) => !recent[index]);
   if (bars.length === 0) return;
-  // Asking again about any one of them would land on the same list.
-  if (!force && (await Promise.all(bars.map((bar) => wasRecentlyPrompted(bar.id)))).some(Boolean)) {
-    return;
-  }
 
   await recordPrompts(bars.map((bar) => bar.id));
   const choices = bars.map((bar) => ({ barId: bar.id, barName: bar.name }));

@@ -2,11 +2,11 @@ import * as Notifications from 'expo-notifications';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, AppState, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AuthProvider, useAuth } from '../lib/AuthProvider';
-import { getPermissionLevel } from '../lib/locationService';
+import { getPermissionLevel, resumeBackgroundUpdates } from '../lib/locationService';
 import { registerForPushNotifications } from '../lib/notifications';
 import { hasSeenLocationIntro } from '../lib/onboarding';
 import { checkInAt } from '../lib/statusSync';
@@ -35,6 +35,23 @@ function RootNavigator() {
     if (!session) return;
     // A refused permission is a normal outcome; the rest of the app works.
     registerForPushNotifications().catch(() => undefined);
+  }, [session]);
+
+  useEffect(() => {
+    if (!session) return;
+
+    const resume = () => {
+      // Nothing here is worth an error to the user: the tracking either
+      // restarts or the next launch tries again.
+      void resumeBackgroundUpdates().catch(() => undefined);
+    };
+
+    resume();
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') resume();
+    });
+
+    return () => subscription.remove();
   }, [session]);
 
   // iOS never offers Always in its first dialog and only allows one upgrade

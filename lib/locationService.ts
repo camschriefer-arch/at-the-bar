@@ -1,6 +1,7 @@
 import * as Location from 'expo-location';
 
 import { BACKGROUND_LOCATION_TASK } from './backgroundLocationTask';
+import { isSharingEnabled } from './sharing';
 
 export type PermissionLevel = 'denied' | 'foreground' | 'background';
 
@@ -57,6 +58,19 @@ export async function startBackgroundUpdates(): Promise<void> {
       notificationBody: 'Checking whether you are at a bar',
     },
   });
+}
+
+/**
+ * Restarts background updates if they are wanted but not running. iOS stops the
+ * task when it terminates the app for memory, and nothing tells the app that
+ * happened: without this a user can go a whole day never being asked about a
+ * venue again.
+ */
+export async function resumeBackgroundUpdates(): Promise<void> {
+  if (!(await isSharingEnabled())) return;
+  if ((await getPermissionLevel()) !== 'background') return;
+
+  await startBackgroundUpdates();
 }
 
 export async function stopBackgroundUpdates(): Promise<void> {

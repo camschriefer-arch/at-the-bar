@@ -6,7 +6,6 @@ import {
   DWELL_MS,
   MAX_CHOICES,
   noteSighting,
-  sightingKey,
   stillAt,
   venuesToConfirm,
 } from '../lib/venues.ts';
@@ -56,14 +55,6 @@ test('the list of venues to pick from is capped', () => {
   assert.equal(venuesToConfirm(here, venues).length, MAX_CHOICES);
 });
 
-test('the dwell clock ignores which of the nearby venues is closest', () => {
-  const a = venue('a', 'bar', 10);
-  const b = venue('b', 'pub', 20);
-
-  assert.equal(sightingKey([a, b]), sightingKey([b, a]));
-  assert.notEqual(sightingKey([a, b]), sightingKey([a]));
-});
-
 test('a confirmed venue stays the status while the user is near it', () => {
   const venues = [venue('jakes', 'restaurant', 200), venue('pub', 'bar', 10)];
 
@@ -79,29 +70,35 @@ test('leaving a confirmed venue clears the status', () => {
 });
 
 test('a first sighting starts the clock and counts for nothing', () => {
-  const { sighting, dwelled } = noteSighting(null, 'jakes', 1_000);
+  const { sighting, dwelled } = noteSighting(null, ['jakes'], 1_000);
 
   assert.equal(dwelled, false);
-  assert.deepEqual(sighting, { barId: 'jakes', since: 1_000 });
+  assert.deepEqual(sighting, { jakes: 1_000 });
 });
 
 test('walking past for less than the dwell never counts', () => {
-  const first = noteSighting(null, 'jakes', 0).sighting;
+  const first = noteSighting(null, ['jakes'], 0).sighting;
 
-  assert.equal(noteSighting(first, 'jakes', DWELL_MS - 1).dwelled, false);
-  assert.equal(noteSighting(first, 'jakes', DWELL_MS).dwelled, true);
+  assert.equal(noteSighting(first, ['jakes'], DWELL_MS - 1).dwelled, false);
+  assert.equal(noteSighting(first, ['jakes'], DWELL_MS).dwelled, true);
+});
+
+test('a neighbour drifting in and out does not restart the clock', () => {
+  const first = noteSighting(null, ['jakes', 'pub'], 0).sighting;
+  const second = noteSighting(first, ['jakes'], DWELL_MS / 2).sighting;
+
+  assert.deepEqual(second, { jakes: 0 });
+  assert.equal(noteSighting(second, ['jakes', 'pub'], DWELL_MS).dwelled, true);
 });
 
 test('moving to another venue restarts the clock', () => {
-  const first = noteSighting(null, 'jakes', 0).sighting;
-  const second = noteSighting(first, 'pub', DWELL_MS).sighting;
+  const first = noteSighting(null, ['jakes'], 0).sighting;
+  const second = noteSighting(first, ['pub'], DWELL_MS).sighting;
 
-  assert.deepEqual(second, { barId: 'pub', since: DWELL_MS });
-  assert.equal(noteSighting(second, 'pub', DWELL_MS + 1).dwelled, false);
+  assert.deepEqual(second, { pub: DWELL_MS });
+  assert.equal(noteSighting(second, ['pub'], DWELL_MS + 1).dwelled, false);
 });
 
 test('a clock from the future is restarted rather than trusted', () => {
-  const skewed = { barId: 'jakes', since: 10_000 };
-
-  assert.deepEqual(noteSighting(skewed, 'jakes', 1_000).sighting, { barId: 'jakes', since: 1_000 });
+  assert.deepEqual(noteSighting({ jakes: 10_000 }, ['jakes'], 1_000).sighting, { jakes: 1_000 });
 });

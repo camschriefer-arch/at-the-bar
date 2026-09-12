@@ -181,12 +181,12 @@ export default function FriendScreen() {
       </View>
 
       <View style={styles.gallery}>
-        <Text style={styles.status}>Their drinks</Text>
+        <Text style={styles.status}>Their favorite beers and drinks</Text>
         <DrinkGallery
           posts={posts}
           urls={photoUrls}
           showPostId={post}
-          emptyLabel={`${friend.display_name} has not posted any drinks yet.`}
+          emptyLabel={`${friend.display_name} has not posted a favorite yet.`}
         />
       </View>
 

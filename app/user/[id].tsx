@@ -123,7 +123,7 @@ export default function PublicProfileScreen() {
         </>
       ) : null}
 
-      {profile.friend_state !== 'self' ? (
+      {profile.friend_state !== 'self' && profile.friend_state !== 'friends' ? (
         <Text style={styles.note}>
           You will only see where {profile.display_name} is out once you are friends.
         </Text>

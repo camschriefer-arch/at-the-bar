@@ -1,3 +1,4 @@
+import { flushPendingNotifications } from './notifications';
 import { supabase } from './supabase';
 import type {
   Bar,
@@ -6,6 +7,7 @@ import type {
   InviteLink,
   InviteResult,
   Profile,
+  PublicProfile,
   TopBar,
   UserStatus,
 } from './types';
@@ -60,6 +62,26 @@ export async function createInviteLink(): Promise<InviteLink> {
 export async function acceptInvite(token: string): Promise<void> {
   const { error } = await supabase.rpc('accept_invite', { p_token: token });
   if (error) throw error;
+}
+
+/** Name and picture only: what someone who is not your friend may see. */
+export async function fetchPublicProfile(userId: string): Promise<PublicProfile | null> {
+  const { data, error } = await supabase.rpc('public_profile', { p_user_id: userId });
+  if (error) throw error;
+  return ((data ?? []) as PublicProfile[])[0] ?? null;
+}
+
+export async function fetchIncomingRequestId(userId: string): Promise<string | null> {
+  const { data, error } = await supabase.rpc('incoming_request_from', { p_user_id: userId });
+  if (error) throw error;
+  return (data as string | null) ?? null;
+}
+
+/** Asks someone to be friends and pushes them the request. */
+export async function requestFriend(userId: string): Promise<void> {
+  const { error } = await supabase.rpc('request_friend', { p_user_id: userId });
+  if (error) throw error;
+  await flushPendingNotifications();
 }
 
 export async function fetchMyProfile(userId: string): Promise<Profile> {

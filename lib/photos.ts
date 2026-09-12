@@ -1,5 +1,6 @@
 import { File } from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
+import { Alert } from 'react-native';
 
 import { flushPendingNotifications } from './notifications';
 import { supabase } from './supabase';
@@ -32,6 +33,43 @@ export async function pickPhoto(aspect: [number, number]): Promise<PickedPhoto |
 
   const asset = result.assets[0];
   return { uri: asset.uri, mimeType: asset.mimeType ?? 'image/jpeg' };
+}
+
+/**
+ * Opens the camera. Returns null when the user backs out or denies access,
+ * which the screens treat as "nothing happened".
+ */
+export async function capturePhoto(aspect: [number, number]): Promise<PickedPhoto | null> {
+  const permission = await ImagePicker.requestCameraPermissionsAsync();
+  if (!permission.granted) return null;
+
+  const result = await ImagePicker.launchCameraAsync({
+    mediaTypes: ['images'],
+    allowsEditing: true,
+    aspect,
+    quality: 0.7,
+  });
+
+  if (result.canceled) return null;
+
+  const asset = result.assets[0];
+  return { uri: asset.uri, mimeType: asset.mimeType ?? 'image/jpeg' };
+}
+
+/** Asks whether the photo should come from the camera or the library. */
+export function choosePhoto(aspect: [number, number]): Promise<PickedPhoto | null> {
+  return new Promise((resolve) => {
+    Alert.alert(
+      'Add a photo',
+      undefined,
+      [
+        { text: 'Take photo', onPress: () => resolve(capturePhoto(aspect)) },
+        { text: 'Choose from library', onPress: () => resolve(pickPhoto(aspect)) },
+        { text: 'Cancel', style: 'cancel', onPress: () => resolve(null) },
+      ],
+      { onDismiss: () => resolve(null) }
+    );
+  });
 }
 
 function extensionFor(mimeType: string): string {

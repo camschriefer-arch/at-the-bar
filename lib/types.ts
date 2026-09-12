@@ -65,6 +65,28 @@ export type DrinkPostDraft = {
   rating: number;
 };
 
+export type PublicProfile = {
+  id: string;
+  display_name: string;
+  avatar_url: string | null;
+  friend_state: 'self' | 'friends' | 'requested' | 'incoming' | 'none';
+};
+
+export type DrinkPostComment = {
+  id: string;
+  author_id: string;
+  display_name: string;
+  avatar_url: string | null;
+  body: string;
+  created_at: string;
+};
+
+export type DrinkPostReaction = {
+  emoji: string;
+  reactions: number;
+  reacted: boolean;
+};
+
 export type FriendRequest = {
   id: string;
   requester_id: string;

@@ -19,9 +19,9 @@ import {
   type PermissionLevel,
 } from '../../lib/locationService';
 import {
+  choosePhoto,
   deleteDrinkPost,
   fetchDrinkPosts,
-  pickPhoto,
   setAvatar,
   signedAvatarUrl,
   signedDrinkUrls,
@@ -183,7 +183,7 @@ export default function ProfileScreen() {
     if (!userId) return;
     setError(null);
     try {
-      const photo = await pickPhoto([1, 1]);
+      const photo = await choosePhoto([1, 1]);
       if (!photo) return;
       const path = await setAvatar(userId, photo);
       setAvatarUrl(await signedAvatarUrl(path));

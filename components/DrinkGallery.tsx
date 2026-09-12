@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { PostSocial } from './PostSocial';
 import { Stars } from './Stars';
 import { colors, spacing } from '../lib/theme';
 import type { DrinkPost } from '../lib/types';
@@ -88,7 +89,12 @@ export function DrinkGallery({
 
             <Image source={urls[open.image_path]} style={styles.full} contentFit="contain" />
 
-            <ScrollView style={styles.details} contentContainerStyle={styles.detailsContent}>
+            <ScrollView
+              style={styles.details}
+              contentContainerStyle={styles.detailsContent}
+              automaticallyAdjustKeyboardInsets
+              keyboardDismissMode="interactive"
+              keyboardShouldPersistTaps="handled">
               <Text style={styles.beerName}>{open.beer_name}</Text>
               <Text style={styles.barName}>{open.bar_name}</Text>
               <Text style={styles.postedOn}>{postedOn(open.created_at)}</Text>
@@ -106,6 +112,7 @@ export function DrinkGallery({
                   <Text style={styles.delete}>Delete photo</Text>
                 </Pressable>
               ) : null}
+              <PostSocial postId={open.id} ownerId={open.user_id} />
             </ScrollView>
           </View>
         ) : null}
@@ -150,7 +157,7 @@ const styles = StyleSheet.create({
   },
   details: {
     backgroundColor: '#000000',
-    maxHeight: '38%',
+    maxHeight: '52%',
   },
   detailsContent: {
     gap: spacing.xs,

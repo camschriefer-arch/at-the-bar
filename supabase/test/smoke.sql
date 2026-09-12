@@ -12,10 +12,10 @@ values
   ('22222222-2222-2222-2222-222222222222', 'grace@example.com'),
   ('33333333-3333-3333-3333-333333333333', 'stranger@example.com');
 
-insert into bars (id, osm_type, osm_id, name, city, state, lat, lng, location)
+insert into bars (id, source, source_id, name, city, state, lat, lng, location)
 values (
   '44444444-4444-4444-4444-444444444444',
-  'node', 1, 'The Long Pour', 'Austin', 'TX', 30.2672, -97.7431,
+  'overture', 'the-long-pour', 'The Long Pour', 'Austin', 'TX', 30.2672, -97.7431,
   st_setsrid(st_makepoint(-97.7431, 30.2672), 4326)::geography
 );
 
@@ -53,6 +53,19 @@ set request.jwt.claim.sub = '22222222-2222-2222-2222-222222222222';
 select count(*) = 0 as friend_sees_nothing_when_home from user_status
   where user_id = '11111111-1111-1111-1111-111111111111';
 select bar_id is null as feed_row_has_no_bar from friend_feed();
+
+-- Leaving closed the visit rather than leaving it open forever, and the
+-- history keeps both timestamps.
+select count(*) = 1 as one_visit_recorded from check_ins
+  where user_id = '11111111-1111-1111-1111-111111111111';
+select departed_at is not null and departed_at >= arrived_at as visit_is_closed
+  from check_ins where user_id = '11111111-1111-1111-1111-111111111111';
+select count(*) = 1 as friend_sees_visit_history
+  from visit_history('11111111-1111-1111-1111-111111111111');
+
+set request.jwt.claim.sub = '33333333-3333-3333-3333-333333333333';
+select count(*) = 0 as stranger_sees_no_visits
+  from visit_history('11111111-1111-1111-1111-111111111111');
 
 -- Grace was queued one arrival and one departure notice, naming Ada but not
 -- the bar. The stranger was queued nothing.
@@ -128,7 +141,9 @@ select count(*) = 1 as email_goes_to_the_removed_person from email_outbox
   where recipient_email = 'ada@example.com';
 select subject = 'grace removed you on At The Bar' as email_names_the_remover
   from email_outbox where recipient_email = 'ada@example.com';
-select count(*) = 2 as removal_pushes_nothing from notification_outbox;
+-- Ada's arrival, her departure and her drink post, and nothing for the
+-- unfriending itself.
+select count(*) = 3 as removal_pushes_nothing from notification_outbox;
 
 -- Storage policies key off the <owner uuid>/<file> prefix of the object name.
 select storage_object_owner('11111111-1111-1111-1111-111111111111/1.jpg')
@@ -155,3 +170,21 @@ select not bool_or(has_function_privilege('authenticated', p.oid, 'execute')) as
     and p.proname in ('claim_push_batch', 'mark_push_sent', 'mark_push_failed',
       'drop_push_tokens', 'prune_notification_outbox', 'claim_email_batch',
       'mark_email_sent', 'mark_email_failed', 'prune_email_outbox');
+
+-- Re-confirming the same bar keeps one visit open; moving on closes it.
+set role authenticated;
+set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+select (set_current_bar('44444444-4444-4444-4444-444444444444')).bar_id is not null as checked_in_again;
+select (set_current_bar('44444444-4444-4444-4444-444444444444')).bar_id is not null as reconfirmed;
+select count(*) = 2 as reconfirm_adds_no_visit from check_ins
+  where user_id = '11111111-1111-1111-1111-111111111111';
+select count(*) = 1 as one_visit_still_open from check_ins
+  where user_id = '11111111-1111-1111-1111-111111111111' and departed_at is null;
+select minutes >= 0 and departed_at is null as open_visit_counts_up
+  from visit_history('11111111-1111-1111-1111-111111111111', 1);
+select (set_current_bar(null)).bar_id is null as checked_out_again;
+select count(*) = 0 as leaving_closes_every_visit from check_ins
+  where user_id = '11111111-1111-1111-1111-111111111111' and departed_at is null;
+select visits = 2 and total_minutes >= 0 as top_bars_reports_time
+  from top_bars('11111111-1111-1111-1111-111111111111');
+reset role;

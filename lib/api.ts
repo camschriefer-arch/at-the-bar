@@ -8,6 +8,7 @@ import type {
   Profile,
   TopBar,
   UserStatus,
+  Visit,
 } from './types';
 
 export async function fetchFriendFeed(): Promise<FriendFeedRow[]> {
@@ -91,6 +92,16 @@ export async function fetchTopBars(userId: string, limit = 5): Promise<TopBar[]>
   const { data, error } = await supabase.rpc('top_bars', { p_user_id: userId, p_limit: limit });
   if (error) throw error;
   return (data ?? []) as TopBar[];
+}
+
+/** Every visit with its timestamps, for yourself or an accepted friend. */
+export async function fetchVisits(userId: string, limit = 50): Promise<Visit[]> {
+  const { data, error } = await supabase.rpc('visit_history', {
+    p_user_id: userId,
+    p_limit: limit,
+  });
+  if (error) throw error;
+  return (data ?? []) as Visit[];
 }
 
 export async function forgetBar(barId: string): Promise<void> {

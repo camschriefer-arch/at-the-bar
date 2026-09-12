@@ -43,6 +43,17 @@ export type TopBar = {
   bar_state: string | null;
   visits: number;
   last_visit: string;
+  total_minutes: number;
+  median_minutes: number | null;
+};
+
+export type Visit = {
+  id: string;
+  bar_id: string;
+  bar_name: string;
+  arrived_at: string;
+  departed_at: string | null;
+  minutes: number;
 };
 
 export type DrinkPost = {

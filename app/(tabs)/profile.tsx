@@ -1,7 +1,8 @@
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { AddVenueModal } from '../../components/AddVenueModal';
 import { Avatar } from '../../components/Avatar';
 import { Button } from '../../components/Button';
 import { DrinkGallery } from '../../components/DrinkGallery';
@@ -35,6 +36,8 @@ import { clearPendingVenue, getPendingVenue, type PendingVenue } from '../../lib
 export default function ProfileScreen() {
   const { session, signOut } = useAuth();
   const userId = session?.user.id;
+  // A comment or reaction push opens the photo it was left on.
+  const { post } = useLocalSearchParams<{ post?: string }>();
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [bar, setBar] = useState<Bar | null>(null);
@@ -46,6 +49,7 @@ export default function ProfileScreen() {
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [addingVenue, setAddingVenue] = useState(false);
   const [nothingNearby, setNothingNearby] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -166,6 +170,21 @@ export default function ProfileScreen() {
     try {
       await checkInAt(barId);
       setPending(null);
+      await load();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not check you in');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const venueAdded = async (added: Bar) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await checkInAt(added.id);
+      setPending(null);
+      setNothingNearby(false);
       await load();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not check you in');
@@ -305,6 +324,12 @@ export default function ProfileScreen() {
               onPress={() => void dismissPending()}
               disabled={busy}
             />
+            <Button
+              title="Add a place that is missing"
+              variant="secondary"
+              onPress={() => setAddingVenue(true)}
+              disabled={busy}
+            />
           </View>
         </View>
       ) : null}
@@ -346,9 +371,19 @@ export default function ProfileScreen() {
           )}
         </View>
         {nothingNearby ? (
-          <Text style={styles.fineprint}>
-            No bars, pubs or restaurants close enough to check into. Nothing was shared.
-          </Text>
+          <>
+            <Text style={styles.fineprint}>
+              No bars, pubs or restaurants close enough to check into. Nothing was shared.
+            </Text>
+            <View style={styles.actions}>
+              <Button
+                title="Add a place that is missing"
+                variant="secondary"
+                onPress={() => setAddingVenue(true)}
+                disabled={busy}
+              />
+            </View>
+          </>
         ) : null}
       </View>
 
@@ -367,8 +402,9 @@ export default function ProfileScreen() {
         <DrinkGallery
           posts={posts}
           urls={photoUrls}
+          showPostId={post}
           emptyLabel="Nothing yet. Post a favorite beer or drink."
-          onDelete={(post) => void removePost(post)}
+          onDelete={(drink) => void removePost(drink)}
         />
         <Button title="Post a favorite" onPress={() => setUploading(true)} />
       </View>
@@ -381,6 +417,12 @@ export default function ProfileScreen() {
           onSaved={addPost}
         />
       ) : null}
+
+      <AddVenueModal
+        visible={addingVenue}
+        onClose={() => setAddingVenue(false)}
+        onAdded={(added) => void venueAdded(added)}
+      />
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 

@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { supabase } from './supabase';
 import { tileBoundingBox, tileKey, type LatLng } from './geo';
-import type { Bar } from './types';
+import type { Bar, VenueCategory } from './types';
 
 const CACHE_PREFIX = 'atb:venues:';
 // Tiles cached before restaurants were added: a different tile size and no
@@ -76,6 +76,32 @@ export async function searchBarsByName(query: string, limit = 10): Promise<Bar[]
 
   if (error) throw error;
   return (data ?? []) as Bar[];
+}
+
+/**
+ * Puts a venue the catalog is missing into it, and returns the catalog row —
+ * the one that was already there when the name matches something a few doors
+ * down. The tile is dropped so the new venue is in range immediately.
+ */
+export async function addVenue(
+  name: string,
+  point: LatLng,
+  category: VenueCategory
+): Promise<Bar> {
+  const { data, error } = await supabase.rpc('add_venue', {
+    p_name: name,
+    p_lat: point.lat,
+    p_lng: point.lng,
+    p_category: category,
+  });
+
+  if (error) throw error;
+
+  const [bar] = (data ?? []) as Bar[];
+  if (!bar) throw new Error('Could not add that venue');
+
+  await AsyncStorage.removeItem(CACHE_PREFIX + tileKey(point));
+  return bar;
 }
 
 export async function clearBarCache(): Promise<void> {

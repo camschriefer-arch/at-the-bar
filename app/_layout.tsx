@@ -95,6 +95,11 @@ function RootNavigator() {
       router.push(`/user/${friendId}`);
       return;
     }
+    if (postId && (event === 'commented' || event === 'reacted')) {
+      // It happened under your own photo, so it opens your gallery, not theirs.
+      router.push(`/(tabs)/profile?post=${postId}`);
+      return;
+    }
     if (friendId) {
       // A drink post opens on the photo it announced; everything else opens the
       // gallery as it stands.

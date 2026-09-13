@@ -13,7 +13,13 @@ import { checkInAt } from '../lib/statusSync';
 import { colors } from '../lib/theme';
 import { clearPendingVenue, VENUE_PROMPT_CONFIRM, VENUE_PROMPT_DISMISS } from '../lib/venuePrompt';
 
-type BarEventPayload = { friendId?: string; kind?: string; barId?: string; postId?: string };
+type BarEventPayload = {
+  friendId?: string;
+  kind?: string;
+  barId?: string;
+  postId?: string;
+  event?: string;
+};
 
 function RootNavigator() {
   const { session, loading } = useAuth();
@@ -81,8 +87,14 @@ function RootNavigator() {
   useEffect(() => {
     if (!session || !tapped) return;
 
-    const { friendId, kind, barId, postId } = tapped.notification.request.content
+    const { friendId, kind, barId, postId, event } = tapped.notification.request.content
       .data as BarEventPayload;
+    if (friendId && event === 'requested') {
+      // Not friends yet, so only the limited profile — where the request can be
+      // accepted — is open to them.
+      router.push(`/user/${friendId}`);
+      return;
+    }
     if (friendId) {
       // A drink post opens on the photo it announced; everything else opens the
       // gallery as it stands.
@@ -132,6 +144,7 @@ function RootNavigator() {
       <Stack.Screen name="(tabs)" options={{ headerShown: false, title: 'Back' }} />
       <Stack.Screen name="location-access" options={{ headerShown: false }} />
       <Stack.Screen name="friend/[id]" options={{ title: 'Friend', headerBackTitle: 'Back' }} />
+      <Stack.Screen name="user/[id]" options={{ title: 'Profile', headerBackTitle: 'Back' }} />
       <Stack.Screen name="redeem" options={{ title: 'Invite' }} />
     </Stack>
   );

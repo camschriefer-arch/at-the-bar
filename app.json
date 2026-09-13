@@ -44,7 +44,9 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "At The Bar needs your photo library so you can post pictures of your drinks."
+          "photosPermission": "At The Bar needs your photo library so you can post pictures of your drinks.",
+          "cameraPermission": "At The Bar needs your camera so you can take a picture of your drink.",
+          "microphonePermission": false
         }
       ],
       [

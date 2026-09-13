@@ -9,7 +9,7 @@ import { Stars } from './Stars';
 import { barsNear } from '../lib/barCache';
 import type { LatLng } from '../lib/geo';
 import { getCurrentPoint } from '../lib/locationService';
-import { createDrinkPost, pickPhoto, type PickedPhoto } from '../lib/photos';
+import { choosePhoto, createDrinkPost, type PickedPhoto } from '../lib/photos';
 import { colors, spacing } from '../lib/theme';
 import type { Bar, DrinkPost } from '../lib/types';
 
@@ -64,11 +64,11 @@ export function UploadDrinkModal({ visible, userId, onClose, onSaved }: UploadDr
     };
   }, [visible]);
 
-  const choosePhoto = async () => {
+  const addPhoto = async () => {
     setError(null);
-    const picked = await pickPhoto([3, 4]);
+    const picked = await choosePhoto([3, 4]);
     if (picked) setPhoto(picked);
-    else if (!photo) setError('Photo access is needed to add a drink.');
+    else if (!photo) setError('Camera or photo access is needed to add a drink.');
   };
 
   const chosenBarName = bar?.name ?? barName.trim();
@@ -115,13 +115,13 @@ export function UploadDrinkModal({ visible, userId, onClose, onSaved }: UploadDr
 
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Choose a photo"
+          accessibilityLabel="Add a photo"
           style={styles.photoSlot}
-          onPress={() => void choosePhoto()}>
+          onPress={() => void addPhoto()}>
           {photo ? (
             <Image source={photo.uri} style={styles.photo} contentFit="cover" />
           ) : (
-            <Text style={styles.muted}>Tap to choose a photo</Text>
+            <Text style={styles.muted}>Tap to take or choose a photo</Text>
           )}
         </Pressable>
 

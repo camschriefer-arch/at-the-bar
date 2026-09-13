@@ -88,40 +88,46 @@ export default function PublicProfileScreen() {
       <Avatar uri={avatarUrl} name={profile.display_name} size={96} />
       <Text style={styles.name}>{profile.display_name}</Text>
 
-      {profile.friend_state === 'friends' ? (
-        <Button title="Open profile" onPress={() => router.replace(`/friend/${profile.id}`)} />
-      ) : null}
+      <View style={styles.actions}>
+        {profile.friend_state === 'friends' ? (
+          <Button title="Open profile" onPress={() => router.replace(`/friend/${profile.id}`)} />
+        ) : null}
 
-      {profile.friend_state === 'none' ? (
-        <Button
-          title="Add friend"
-          disabled={busy}
-          onPress={() => void run(() => requestFriend(profile.id), 'Could not send that request')}
-        />
-      ) : null}
-
-      {profile.friend_state === 'requested' ? <Text style={styles.muted}>Request sent</Text> : null}
-
-      {profile.friend_state === 'incoming' && requestId ? (
-        <>
-          <Text style={styles.muted}>{profile.display_name} wants to be your friend.</Text>
+        {profile.friend_state === 'none' ? (
           <Button
-            title="Accept"
+            title="Add friend"
             disabled={busy}
             onPress={() =>
-              void run(() => respondToRequest(requestId, true), 'Could not accept that request')
+              void run(() => requestFriend(profile.id), 'Could not send that request')
             }
           />
-          <Button
-            title="Decline"
-            variant="secondary"
-            disabled={busy}
-            onPress={() =>
-              void run(() => respondToRequest(requestId, false), 'Could not decline that request')
-            }
-          />
-        </>
-      ) : null}
+        ) : null}
+
+        {profile.friend_state === 'requested' ? (
+          <Text style={styles.muted}>Request sent</Text>
+        ) : null}
+
+        {profile.friend_state === 'incoming' && requestId ? (
+          <>
+            <Text style={styles.muted}>{profile.display_name} wants to be your friend.</Text>
+            <Button
+              title="Accept"
+              disabled={busy}
+              onPress={() =>
+                void run(() => respondToRequest(requestId, true), 'Could not accept that request')
+              }
+            />
+            <Button
+              title="Decline"
+              variant="secondary"
+              disabled={busy}
+              onPress={() =>
+                void run(() => respondToRequest(requestId, false), 'Could not decline that request')
+              }
+            />
+          </>
+        ) : null}
+      </View>
 
       {profile.friend_state !== 'self' && profile.friend_state !== 'friends' ? (
         <Text style={styles.note}>
@@ -153,8 +159,13 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '700',
   },
+  actions: {
+    alignSelf: 'stretch',
+    gap: spacing.md,
+  },
   muted: {
     color: colors.muted,
+    textAlign: 'center',
   },
   note: {
     color: colors.muted,

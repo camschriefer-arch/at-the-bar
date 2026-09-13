@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { formatMinutes } from '../lib/duration';
 import { colors, spacing } from '../lib/theme';
 import type { TopBar } from '../lib/types';
 
@@ -47,7 +48,11 @@ export function TopBars({ bars, emptyLabel, onForget }: TopBarsProps) {
               {bar.bar_name}
             </Text>
             <Text style={styles.muted} numberOfLines={1}>
-              {[[bar.bar_city, bar.bar_state].filter(Boolean).join(', '), visitLabel(bar.visits)]
+              {[
+                [bar.bar_city, bar.bar_state].filter(Boolean).join(', '),
+                visitLabel(bar.visits),
+                stayLabel(bar.median_minutes),
+              ]
                 .filter(Boolean)
                 .join(' · ')}
             </Text>
@@ -69,6 +74,11 @@ export function TopBars({ bars, emptyLabel, onForget }: TopBarsProps) {
 
 function visitLabel(visits: number): string {
   return visits === 1 ? '1 visit' : `${visits} visits`;
+}
+
+function stayLabel(medianMinutes: number | null): string | null {
+  const stay = formatMinutes(medianMinutes);
+  return stay ? `usually ${stay}` : null;
 }
 
 const styles = StyleSheet.create({

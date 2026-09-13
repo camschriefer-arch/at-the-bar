@@ -363,14 +363,14 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.label}>Your drinks</Text>
+        <Text style={styles.label}>Your favorite beers and drinks</Text>
         <DrinkGallery
           posts={posts}
           urls={photoUrls}
-          emptyLabel="No drinks yet. Post the best beer you have had."
+          emptyLabel="Nothing yet. Post a favorite beer or drink."
           onDelete={(post) => void removePost(post)}
         />
-        <Button title="Upload your drinks" onPress={() => setUploading(true)} />
+        <Button title="Post a favorite" onPress={() => setUploading(true)} />
       </View>
 
       {userId ? (

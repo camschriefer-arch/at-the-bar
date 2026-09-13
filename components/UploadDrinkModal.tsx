@@ -79,7 +79,7 @@ export function UploadDrinkModal({ visible, userId, onClose, onSaved }: UploadDr
       return;
     }
     if (!chosenBarName || !beerName.trim() || rating === 0) {
-      setError('Bar, drink and a rating are required.');
+      setError('Bar, a beer or drink, and a rating are required.');
       return;
     }
 
@@ -111,7 +111,7 @@ export function UploadDrinkModal({ visible, userId, onClose, onSaved }: UploadDr
         automaticallyAdjustKeyboardInsets
         keyboardDismissMode="interactive"
         keyboardShouldPersistTaps="handled">
-        <Text style={styles.title}>Upload your drink</Text>
+        <Text style={styles.title}>Post a favorite beer or drink</Text>
 
         <Pressable
           accessibilityRole="button"
@@ -137,7 +137,7 @@ export function UploadDrinkModal({ visible, userId, onClose, onSaved }: UploadDr
         />
 
         <Field
-          label="Drink"
+          label="Favorite beer or drink"
           value={beerName}
           onChangeText={setBeerName}
           placeholder="Pilsner, IPA, house lager…"

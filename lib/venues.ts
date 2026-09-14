@@ -28,7 +28,7 @@ export function stillAt(
  * past a bar takes seconds; this is what keeps a commute from setting a status
  * or firing a string of "are you here?" notifications.
  */
-export const DWELL_MS = 3 * 60 * 1000;
+export const DWELL_MS = 5 * 60 * 1000;
 
 /** When each venue currently in range was first seen. */
 export type Sighting = Record<string, number>;
@@ -52,6 +52,34 @@ export function noteSighting(
 
   const dwelled = Object.values(sighting).some((since) => now - since >= DWELL_MS);
   return { sighting, dwelled };
+}
+
+/** When each venue was last asked about, or last turned down. */
+export type QuietVenues = Record<string, number>;
+
+/** Marks `barIds` as quiet as of `now`, dropping entries that have run out. */
+export function noteQuiet(
+  previous: QuietVenues | null,
+  barIds: readonly string[],
+  now: number,
+  quietMs: number
+): QuietVenues {
+  const quiet: QuietVenues = Object.fromEntries(barIds.map((id) => [id, now]));
+  for (const [id, at] of Object.entries(previous ?? {})) {
+    if (now - at < quietMs && quiet[id] === undefined) quiet[id] = at;
+  }
+
+  return quiet;
+}
+
+export function isQuiet(
+  quiet: QuietVenues | null,
+  barId: string,
+  now: number,
+  quietMs: number
+): boolean {
+  const at = quiet?.[barId];
+  return at !== undefined && at <= now && now - at < quietMs;
 }
 
 /**

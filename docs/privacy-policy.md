@@ -32,9 +32,10 @@ can notice when you arrive somewhere. Here is exactly what happens:
 
 1. Your device reads your location and compares it, **on the device**, against a
    catalog of venues downloaded from OpenStreetMap.
-2. If you have stayed within about 0.1 miles of a venue for three minutes, the
-   app asks you — with a notification or a prompt in the app — whether you are
-   there.
+2. If you have stayed within about 0.1 miles of a venue for five minutes
+   without moving, the app asks you — with a notification or a prompt in the
+   app — whether you are there. Walking or driving past never asks, and a
+   venue you answer "Not here" about is left alone for two weeks.
 3. If you say yes, the app sends **only the venue's identifier** to our server.
    If you say no, or ignore it, nothing is sent.
 4. When you move away from that venue, the app clears your status. The check-in

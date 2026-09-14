@@ -31,7 +31,7 @@ import { isSharingEnabled, setSharingEnabled } from '../../lib/sharing';
 import { checkInAt, clearStatus, syncStatusForLocation } from '../../lib/statusSync';
 import { colors, spacing } from '../../lib/theme';
 import type { Bar, DrinkPost, Profile, TopBar } from '../../lib/types';
-import { clearPendingVenue, getPendingVenue, type PendingVenue } from '../../lib/venuePrompt';
+import { declinePendingVenue, getPendingVenue, type PendingVenue } from '../../lib/venuePrompt';
 
 export default function ProfileScreen() {
   const { session, signOut } = useAuth();
@@ -195,7 +195,7 @@ export default function ProfileScreen() {
 
   const dismissPending = async () => {
     setPending(null);
-    await clearPendingVenue();
+    await declinePendingVenue();
   };
 
   const changeAvatar = async () => {

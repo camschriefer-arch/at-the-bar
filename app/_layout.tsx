@@ -11,7 +11,11 @@ import { registerForPushNotifications } from '../lib/notifications';
 import { hasSeenLocationIntro } from '../lib/onboarding';
 import { checkInAt } from '../lib/statusSync';
 import { colors } from '../lib/theme';
-import { clearPendingVenue, VENUE_PROMPT_CONFIRM, VENUE_PROMPT_DISMISS } from '../lib/venuePrompt';
+import {
+  declinePendingVenue,
+  VENUE_PROMPT_CONFIRM,
+  VENUE_PROMPT_DISMISS,
+} from '../lib/venuePrompt';
 
 type BarEventPayload = {
   friendId?: string;
@@ -114,7 +118,7 @@ function RootNavigator() {
     void Notifications.clearLastNotificationResponseAsync();
 
     if (tapped.actionIdentifier === VENUE_PROMPT_DISMISS) {
-      void clearPendingVenue();
+      void declinePendingVenue();
     } else if (tapped.actionIdentifier === VENUE_PROMPT_CONFIRM && barId) {
       void checkInAt(barId);
     } else {

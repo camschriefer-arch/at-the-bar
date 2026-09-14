@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 
 import type { Bar } from './types';
+import { isQuiet, noteQuiet, type QuietVenues } from './venues';
 
 export const VENUE_PROMPT_CATEGORY = 'venue.confirm';
 export const VENUE_PROMPT_CONFIRM = 'venue.confirm.yes';
@@ -9,6 +10,7 @@ export const VENUE_PROMPT_DISMISS = 'venue.confirm.no';
 
 const PENDING_KEY = 'atb:pendingVenue';
 const PROMPTED_KEY = 'atb:promptedVenues';
+const DECLINED_KEY = 'atb:declinedVenues';
 
 /**
  * A venue is only asked about once per visit: long enough that walking past the
@@ -16,6 +18,14 @@ const PROMPTED_KEY = 'atb:promptedVenues';
  * next day asks again.
  */
 const PROMPT_COOLDOWN_MS = 6 * 60 * 60 * 1000;
+
+/**
+ * How long "Not here" lasts. The venues a user turns down are the ones they
+ * pass every day — the cafe by the office, the restaurant under the gym — so
+ * asking again tomorrow asks forever. Two weeks answers once a fortnight,
+ * while still catching the day they do go in.
+ */
+export const DECLINE_QUIET_MS = 14 * 24 * 60 * 60 * 1000;
 
 export type PendingChoice = { barId: string; barName: string };
 
@@ -25,8 +35,6 @@ export type PendingVenue = {
   promptedAt: number;
   notificationId?: string;
 };
-
-type PromptedVenues = Record<string, number>;
 
 let categoryRegistered = false;
 
@@ -50,34 +58,71 @@ async function ensureCategory(): Promise<void> {
   categoryRegistered = true;
 }
 
-async function readPrompted(): Promise<PromptedVenues> {
-  const raw = await AsyncStorage.getItem(PROMPTED_KEY);
+async function readQuiet(key: string): Promise<QuietVenues> {
+  const raw = await AsyncStorage.getItem(key);
   if (!raw) return {};
 
   try {
-    return JSON.parse(raw) as PromptedVenues;
+    return JSON.parse(raw) as QuietVenues;
   } catch {
     return {};
   }
 }
 
-async function recordPrompts(barIds: readonly string[]): Promise<void> {
-  const prompted = await readPrompted();
-  const now = Date.now();
-  const cutoff = now - PROMPT_COOLDOWN_MS;
-
-  const kept: PromptedVenues = Object.fromEntries(barIds.map((id) => [id, now]));
-  for (const [id, at] of Object.entries(prompted)) {
-    if (at > cutoff && kept[id] === undefined) kept[id] = at;
-  }
-
-  await AsyncStorage.setItem(PROMPTED_KEY, JSON.stringify(kept));
+async function recordQuiet(
+  key: string,
+  barIds: readonly string[],
+  quietMs: number
+): Promise<void> {
+  const quiet = noteQuiet(await readQuiet(key), barIds, Date.now(), quietMs);
+  await AsyncStorage.setItem(key, JSON.stringify(quiet));
 }
 
-export async function wasRecentlyPrompted(barId: string): Promise<boolean> {
-  const prompted = await readPrompted();
-  const at = prompted[barId];
-  return at !== undefined && Date.now() - at < PROMPT_COOLDOWN_MS;
+/** Whether a venue is inside either quiet period and so should not be raised. */
+export async function isSuppressed(barId: string): Promise<boolean> {
+  const now = Date.now();
+  const [prompted, declined] = await Promise.all([
+    readQuiet(PROMPTED_KEY),
+    readQuiet(DECLINED_KEY),
+  ]);
+
+  return (
+    isQuiet(prompted, barId, now, PROMPT_COOLDOWN_MS) ||
+    isQuiet(declined, barId, now, DECLINE_QUIET_MS)
+  );
+}
+
+/**
+ * Records that the user said they are not at the venues they were asked about.
+ * Turning a prompt down is the clearest signal the app gets that a venue is
+ * somewhere the user passes rather than goes, so it is worth remembering for
+ * much longer than an unanswered prompt.
+ */
+export async function declinePendingVenue(): Promise<void> {
+  const pending = await getPendingVenue();
+  if (pending) {
+    await recordQuiet(
+      DECLINED_KEY,
+      pending.choices.map((choice) => choice.barId),
+      DECLINE_QUIET_MS
+    );
+  }
+
+  await clearPendingVenue();
+}
+
+/**
+ * Forgets both quiet periods for a venue the user checked in to by hand: they
+ * have just said they do go there, whatever they answered last time.
+ */
+export async function allowVenue(barId: string): Promise<void> {
+  for (const key of [PROMPTED_KEY, DECLINED_KEY]) {
+    const quiet = await readQuiet(key);
+    if (quiet[barId] === undefined) continue;
+
+    delete quiet[barId];
+    await AsyncStorage.setItem(key, JSON.stringify(quiet));
+  }
 }
 
 /**
@@ -87,20 +132,25 @@ export async function wasRecentlyPrompted(barId: string): Promise<boolean> {
  * the phone cannot tell which of two adjacent bars you are in, so the user
  * picks from a list in the app. Venues already asked about are dropped from
  * the list rather than silencing it: a bar down the street from one you were
- * asked about earlier is a new visit. `force` re-asks inside the cooldown, for
- * a prompt the user asked for by hand.
+ * asked about earlier is a new visit, and one turned down stays quiet for a
+ * fortnight. `force` re-asks inside either quiet period, for a prompt the user
+ * asked for by hand.
  */
 export async function promptForVenues(
   candidates: readonly Bar[],
   { force = false } = {}
 ): Promise<void> {
-  const recent = force
+  const quiet = force
     ? candidates.map(() => false)
-    : await Promise.all(candidates.map((bar) => wasRecentlyPrompted(bar.id)));
-  const bars = candidates.filter((_, index) => !recent[index]);
+    : await Promise.all(candidates.map((bar) => isSuppressed(bar.id)));
+  const bars = candidates.filter((_, index) => !quiet[index]);
   if (bars.length === 0) return;
 
-  await recordPrompts(bars.map((bar) => bar.id));
+  await recordQuiet(
+    PROMPTED_KEY,
+    bars.map((bar) => bar.id),
+    PROMPT_COOLDOWN_MS
+  );
   const choices = bars.map((bar) => ({ barId: bar.id, barName: bar.name }));
   await clearPendingVenue();
 

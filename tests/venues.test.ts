@@ -4,11 +4,15 @@ import { test } from 'node:test';
 import type { Bar, VenueCategory } from '../lib/types.ts';
 import {
   DWELL_MS,
+  isQuiet,
   MAX_CHOICES,
+  noteQuiet,
   noteSighting,
   stillAt,
   venuesToConfirm,
 } from '../lib/venues.ts';
+
+const HOUR = 60 * 60 * 1000;
 
 const here = { lat: 42.3798562, lng: -71.2629227 };
 
@@ -101,4 +105,25 @@ test('moving to another venue restarts the clock', () => {
 
 test('a clock from the future is restarted rather than trusted', () => {
   assert.deepEqual(noteSighting({ jakes: 10_000 }, ['jakes'], 1_000).sighting, { jakes: 1_000 });
+});
+
+test('a venue stays quiet for its period and speaks up after it', () => {
+  const quiet = noteQuiet(null, ['jakes'], 0, 6 * HOUR);
+
+  assert.equal(isQuiet(quiet, 'jakes', 5 * HOUR, 6 * HOUR), true);
+  assert.equal(isQuiet(quiet, 'jakes', 6 * HOUR, 6 * HOUR), false);
+  assert.equal(isQuiet(quiet, 'pub', 0, 6 * HOUR), false);
+});
+
+test('quieting one venue neither restarts nor forgets another still running', () => {
+  const first = noteQuiet(null, ['jakes', 'pub'], 0, 6 * HOUR);
+  const second = noteQuiet(first, ['jakes'], 3 * HOUR, 6 * HOUR);
+
+  assert.deepEqual(second, { jakes: 3 * HOUR, pub: 0 });
+});
+
+test('venues whose quiet period ran out are dropped rather than kept forever', () => {
+  const first = noteQuiet(null, ['pub'], 0, 6 * HOUR);
+
+  assert.deepEqual(noteQuiet(first, ['jakes'], 7 * HOUR, 6 * HOUR), { jakes: 7 * HOUR });
 });

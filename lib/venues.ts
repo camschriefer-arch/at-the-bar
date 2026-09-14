@@ -54,6 +54,34 @@ export function noteSighting(
   return { sighting, dwelled };
 }
 
+/** When each venue was last asked about, or last turned down. */
+export type QuietVenues = Record<string, number>;
+
+/** Marks `barIds` as quiet as of `now`, dropping entries that have run out. */
+export function noteQuiet(
+  previous: QuietVenues | null,
+  barIds: readonly string[],
+  now: number,
+  quietMs: number
+): QuietVenues {
+  const quiet: QuietVenues = Object.fromEntries(barIds.map((id) => [id, now]));
+  for (const [id, at] of Object.entries(previous ?? {})) {
+    if (now - at < quietMs && quiet[id] === undefined) quiet[id] = at;
+  }
+
+  return quiet;
+}
+
+export function isQuiet(
+  quiet: QuietVenues | null,
+  barId: string,
+  now: number,
+  quietMs: number
+): boolean {
+  const at = quiet?.[barId];
+  return at !== undefined && at <= now && now - at < quietMs;
+}
+
 /**
  * How many venues a user is asked to pick between. Dense blocks can have a
  * dozen in range, which is a list nobody reads.

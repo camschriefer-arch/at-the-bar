@@ -8,6 +8,9 @@ export const BACKGROUND_LOCATION_TASK = 'atb-background-location';
 
 type LocationTaskData = { locations?: LocationObject[] };
 
+const positive = (value: number | null | undefined) =>
+  typeof value === 'number' && value >= 0 ? value : null;
+
 // Must be registered in the top-level scope so the task exists when the OS
 // relaunches the app in the background.
 TaskManager.defineTask<LocationTaskData>(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
@@ -22,10 +25,15 @@ TaskManager.defineTask<LocationTaskData>(BACKGROUND_LOCATION_TASK, async ({ data
   if (!(await isSharingEnabled())) return;
 
   try {
-    await syncStatusForLocation({
-      lat: latest.coords.latitude,
-      lng: latest.coords.longitude,
-    });
+    await syncStatusForLocation(
+      { lat: latest.coords.latitude, lng: latest.coords.longitude },
+      {
+        // Both are reported as a negative number when the platform has no
+        // reading, which would otherwise read as standing perfectly still.
+        speedMps: positive(latest.coords.speed),
+        accuracyMeters: positive(latest.coords.accuracy),
+      }
+    );
   } catch (cause) {
     console.warn('Failed to sync bar status', cause);
   }

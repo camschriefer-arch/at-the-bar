@@ -28,7 +28,7 @@ export function stillAt(
  * past a bar takes seconds; this is what keeps a commute from setting a status
  * or firing a string of "are you here?" notifications.
  */
-export const DWELL_MS = 3 * 60 * 1000;
+export const DWELL_MS = 5 * 60 * 1000;
 
 /** When each venue currently in range was first seen. */
 export type Sighting = Record<string, number>;

@@ -45,7 +45,7 @@ export async function startBackgroundUpdates(): Promise<void> {
     // radius, so a fix has to be good enough to place a building.
     accuracy: Location.Accuracy.High,
     // Sitting still in a bar is the case that has to work, so updates cannot be
-    // gated on movement: the dwell needs a second fix at the same venue three
+    // gated on movement: the dwell needs a second fix at the same venue five
     // minutes after the first. Time keeps the rate down instead.
     distanceInterval: 0,
     timeInterval: 60_000,

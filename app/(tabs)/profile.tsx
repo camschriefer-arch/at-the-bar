@@ -10,6 +10,7 @@ import { TopBars } from '../../components/TopBars';
 import { UploadDrinkModal } from '../../components/UploadDrinkModal';
 import { fetchMyProfile, fetchMyStatus, fetchTopBars, forgetBar } from '../../lib/api';
 import { useAuth } from '../../lib/AuthProvider';
+import { fetchBlockedUsers, unblockUser, type BlockedUser } from '../../lib/moderation';
 import {
   getPermissionLevel,
   getCurrentPoint,
@@ -46,6 +47,7 @@ export default function ProfileScreen() {
   const [pending, setPending] = useState<PendingVenue | null>(null);
   const [posts, setPosts] = useState<DrinkPost[]>([]);
   const [topBars, setTopBars] = useState<TopBar[]>([]);
+  const [blocked, setBlocked] = useState<BlockedUser[]>([]);
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -57,7 +59,7 @@ export default function ProfileScreen() {
   const load = useCallback(async () => {
     if (!userId) return;
     try {
-      const [me, status, level, enabled, drinks, frequented, prompt] = await Promise.all([
+      const [me, status, level, enabled, drinks, frequented, prompt, blocks] = await Promise.all([
         fetchMyProfile(userId),
         fetchMyStatus(userId),
         getPermissionLevel(),
@@ -65,8 +67,10 @@ export default function ProfileScreen() {
         fetchDrinkPosts(userId),
         fetchTopBars(userId),
         getPendingVenue(),
+        fetchBlockedUsers(),
       ]);
       setProfile(me);
+      setBlocked(blocks);
       setTopBars(frequented);
       setBar(status.bar);
       setPermission(level);
@@ -236,6 +240,15 @@ export default function ProfileScreen() {
     void signedDrinkUrls([post]).then((urls) =>
       setPhotoUrls((current) => ({ ...current, ...urls }))
     );
+  };
+
+  const unblock = async (person: BlockedUser) => {
+    try {
+      await unblockUser(person.id);
+      setBlocked((current) => current.filter((entry) => entry.id !== person.id));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not unblock');
+    }
   };
 
   const refreshStatus = async () => {
@@ -424,6 +437,26 @@ export default function ProfileScreen() {
         onAdded={(added) => void venueAdded(added)}
       />
 
+      {blocked.length > 0 ? (
+        <View style={styles.section}>
+          <Text style={styles.label}>Blocked</Text>
+          <Text style={styles.fineprint}>
+            You do not see their posts or comments, and they do not see yours.
+          </Text>
+          {blocked.map((person) => (
+            <View key={person.id} style={styles.blocked}>
+              <Text style={styles.name}>{person.display_name}</Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Unblock ${person.display_name}`}
+                onPress={() => void unblock(person)}>
+                <Text style={styles.unblock}>Unblock</Text>
+              </Pressable>
+            </View>
+          ))}
+        </View>
+      ) : null}
+
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
       <Button title="Sign out" variant="secondary" onPress={() => void signOut()} />
@@ -441,6 +474,15 @@ const styles = StyleSheet.create({
   },
   section: {
     gap: spacing.sm,
+  },
+  blocked: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  unblock: {
+    color: colors.accent,
+    fontWeight: '600',
   },
   header: {
     alignItems: 'center',

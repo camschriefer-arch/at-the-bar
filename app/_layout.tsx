@@ -99,9 +99,10 @@ function RootNavigator() {
       router.push(`/user/${friendId}`);
       return;
     }
-    if (postId && (event === 'commented' || event === 'reacted')) {
-      // It happened under your own photo, so it opens your gallery, not theirs.
-      router.push(`/(tabs)/profile?post=${postId}`);
+    if (event === 'commented' || event === 'reacted') {
+      // Under your own photo it opens your gallery, not theirs; under a night
+      // out of yours there is nothing but the feed card it was left on.
+      router.push(postId ? `/(tabs)/profile?post=${postId}` : '/(tabs)');
       return;
     }
     if (friendId) {
@@ -154,6 +155,7 @@ function RootNavigator() {
       <Stack.Screen name="location-access" options={{ headerShown: false }} />
       <Stack.Screen name="friend/[id]" options={{ title: 'Friend', headerBackTitle: 'Back' }} />
       <Stack.Screen name="user/[id]" options={{ title: 'Profile', headerBackTitle: 'Back' }} />
+      <Stack.Screen name="post/[id]" options={{ title: 'Post', headerBackTitle: 'Back' }} />
       <Stack.Screen name="redeem" options={{ title: 'Invite' }} />
     </Stack>
   );

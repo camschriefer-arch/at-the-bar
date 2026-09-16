@@ -1,57 +1,79 @@
-import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
-import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  RefreshControl,
+  StyleSheet,
+  Text,
+} from "react-native";
 
-import { Button } from '../../components/Button';
-import { fetchFriendFeed, fetchIncomingRequests, respondToRequest } from '../../lib/api';
-import { useAuth } from '../../lib/AuthProvider';
-import { colors, spacing } from '../../lib/theme';
-import type { FriendFeedRow, Profile } from '../../lib/types';
+import { FeedCard } from "../../components/FeedCard";
+import { ReportModal } from "../../components/ReportModal";
+import { useAuth } from "../../lib/AuthProvider";
+import {
+  FEED_PAGE_SIZE,
+  fetchFeed,
+  fetchFeedVisit,
+  feedKey,
+} from "../../lib/feed";
+import { blockUser } from "../../lib/moderation";
+import { signedAvatarUrlsFor, signedDrinkUrlsFor } from "../../lib/photos";
+import { colors, spacing } from "../../lib/theme";
+import type { FeedItem } from "../../lib/types";
 
-const REFRESH_INTERVAL_MS = 30_000;
-
-function sinceLabel(arrivedAt: string | null): string {
-  if (!arrivedAt) return '';
-  const minutes = Math.max(0, Math.round((Date.now() - Date.parse(arrivedAt)) / 60_000));
-  if (minutes < 60) return `${minutes}m`;
-  return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
-}
-
-export default function FriendsScreen() {
+export default function FeedScreen() {
   const { session } = useAuth();
   const router = useRouter();
   const userId = session?.user.id;
 
-  const [friends, setFriends] = useState<FriendFeedRow[]>([]);
-  const [requests, setRequests] = useState<{ id: string; requester: Profile }[]>([]);
+  const [items, setItems] = useState<FeedItem[]>([]);
+  const [urls, setUrls] = useState<Record<string, string>>({});
+  const [avatars, setAvatars] = useState<Record<string, string>>({});
   const [refreshing, setRefreshing] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [end, setEnd] = useState(false);
+  const [reporting, setReporting] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const sign = useCallback(async (page: FeedItem[]) => {
+    const photos = page
+      .map((item) => item.image_path)
+      .filter((path): path is string => path !== null);
+    const faces = page
+      .map((item) => item.avatar_url)
+      .filter((path): path is string => path !== null);
+
+    const [photoUrls, avatarUrls] = await Promise.all([
+      signedDrinkUrlsFor(photos),
+      signedAvatarUrlsFor(faces),
+    ]);
+
+    setUrls((previous) => ({ ...previous, ...photoUrls }));
+    setAvatars((previous) => ({ ...previous, ...avatarUrls }));
+  }, []);
 
   const load = useCallback(async () => {
     if (!userId) return;
     try {
-      const [feed, incoming] = await Promise.all([
-        fetchFriendFeed(),
-        fetchIncomingRequests(userId),
-      ]);
-      setFriends(feed);
-      setRequests(incoming.map(({ request, requester }) => ({ id: request.id, requester })));
+      const page = await fetchFeed();
+      setItems(page);
+      setEnd(page.length < FEED_PAGE_SIZE);
+      await sign(page);
       setError(null);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not load friends');
+      setError(
+        cause instanceof Error ? cause.message : "Could not load the feed",
+      );
     }
-  }, [userId]);
+  }, [sign, userId]);
 
   useFocusEffect(
     useCallback(() => {
       void load();
-    }, [load])
+    }, [load]),
   );
-
-  useEffect(() => {
-    const timer = setInterval(() => void load(), REFRESH_INTERVAL_MS);
-    return () => clearInterval(timer);
-  }, [load]);
 
   const refresh = async () => {
     setRefreshing(true);
@@ -59,87 +81,155 @@ export default function FriendsScreen() {
     setRefreshing(false);
   };
 
-  const respond = async (friendshipId: string, accept: boolean) => {
-    await respondToRequest(friendshipId, accept);
-    await load();
+  const loadMore = async () => {
+    const oldest = items[items.length - 1];
+    if (!oldest || end || loadingMore || refreshing) return;
+
+    setLoadingMore(true);
+    try {
+      const page = await fetchFeed(oldest.created_at);
+      setItems((previous) => [...previous, ...page]);
+      setEnd(page.length < FEED_PAGE_SIZE);
+      await sign(page);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not load more");
+    }
+    setLoadingMore(false);
   };
 
-  const atTheBar = friends.filter((friend) => friend.bar_id !== null);
-  const elsewhere = friends.filter((friend) => friend.bar_id === null);
+  /**
+   * A comment or a reaction changes one card, so only that card is refetched:
+   * reloading the first page would drop everything paged in below it.
+   */
+  const refreshVisit = useCallback(async (item: FeedItem) => {
+    if (item.kind === "post") return;
+    try {
+      const fresh = await fetchFeedVisit(item.id, item.kind);
+      if (!fresh) return;
+      setItems((previous) =>
+        previous.map((row) =>
+          row.kind === fresh.kind && row.id === fresh.id ? fresh : row,
+        ),
+      );
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : "Could not refresh that post",
+      );
+    }
+  }, []);
+
+  const block = (item: FeedItem) => {
+    Alert.alert(
+      `Block ${item.display_name}?`,
+      "You will not see their posts or comments, and they will not see yours.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Block",
+          style: "destructive",
+          onPress: () => {
+            void blockUser(item.user_id)
+              .then(load)
+              .catch((cause: unknown) =>
+                Alert.alert(
+                  "Could not block",
+                  cause instanceof Error ? cause.message : "Try again",
+                ),
+              );
+          },
+        },
+      ],
+    );
+  };
+
+  const options = (item: FeedItem) => {
+    if (item.user_id === userId) return;
+
+    Alert.alert(item.display_name, undefined, [
+      ...(item.kind === "post"
+        ? [
+            {
+              text: "Report post",
+              style: "destructive" as const,
+              onPress: () => setReporting(item.id),
+            },
+          ]
+        : []),
+      {
+        text: `Block ${item.display_name}`,
+        style: "destructive" as const,
+        onPress: () => block(item),
+      },
+      { text: "Cancel", style: "cancel" as const },
+    ]);
+  };
 
   return (
-    <FlatList
-      style={styles.list}
-      contentContainerStyle={styles.content}
-      data={atTheBar}
-      keyExtractor={(item) => item.friend_id}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.muted} />
-      }
-      ListHeaderComponent={
-        <View style={styles.header}>
-          {error ? <Text style={styles.error}>{error}</Text> : null}
-
-          {requests.length > 0 ? (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Friend requests</Text>
-              {requests.map((request) => (
-                <View key={request.id} style={styles.card}>
-                  <Text style={styles.name}>{request.requester.display_name}</Text>
-                  <Text style={styles.muted}>{request.requester.email}</Text>
-                  <View style={styles.actions}>
-                    <View style={styles.action}>
-                      <Button title="Accept" onPress={() => void respond(request.id, true)} />
-                    </View>
-                    <View style={styles.action}>
-                      <Button
-                        title="Decline"
-                        variant="secondary"
-                        onPress={() => void respond(request.id, false)}
-                      />
-                    </View>
-                  </View>
-                </View>
-              ))}
-            </View>
-          ) : null}
-
-          <Text style={styles.sectionTitle}>At the bar</Text>
-          {atTheBar.length === 0 ? (
-            <Text style={styles.muted}>Nobody is out right now.</Text>
-          ) : null}
-        </View>
-      }
-      renderItem={({ item }) => (
-        <Pressable
-          style={styles.card}
-          onPress={() => router.push({ pathname: '/friend/[id]', params: { id: item.friend_id } })}>
-          <Text style={styles.name}>{item.display_name}</Text>
-          <Text style={styles.barName}>{item.bar_name}</Text>
-          <Text style={styles.muted}>
-            {[item.bar_city, item.bar_state].filter(Boolean).join(', ')}
-            {item.arrived_at ? ` · ${sinceLabel(item.arrived_at)}` : ''}
-          </Text>
-        </Pressable>
-      )}
-      ListFooterComponent={
-        elsewhere.length > 0 ? (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Not out</Text>
-            {elsewhere.map((friend) => (
-              <Pressable
-                key={friend.friend_id}
-                style={styles.cardMuted}
-                onPress={() =>
-                  router.push({ pathname: '/friend/[id]', params: { id: friend.friend_id } })
-                }>
-                <Text style={styles.name}>{friend.display_name}</Text>
-              </Pressable>
-            ))}
-          </View>
-        ) : null
-      }
-    />
+    <>
+      <ReportModal
+        postId={reporting}
+        onClose={() => setReporting(null)}
+        onReported={() =>
+          Alert.alert("Reported", "Thanks — we will take a look.")
+        }
+      />
+      <FlatList
+        style={styles.list}
+        contentContainerStyle={styles.content}
+        data={items}
+        keyExtractor={feedKey}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={refresh}
+            tintColor={colors.muted}
+          />
+        }
+        onEndReached={() => void loadMore()}
+        onEndReachedThreshold={0.6}
+        ListHeaderComponent={
+          <>
+            {error ? <Text style={styles.error}>{error}</Text> : null}
+            <Text style={styles.intro}>
+              Where your friends are, and what they are drinking.
+            </Text>
+          </>
+        }
+        ListEmptyComponent={
+          error ? null : (
+            <Text style={styles.muted}>
+              Nothing here yet. Check in at a bar, or post what you are
+              drinking.
+            </Text>
+          )
+        }
+        ListFooterComponent={
+          loadingMore ? (
+            <ActivityIndicator color={colors.muted} style={styles.spinner} />
+          ) : null
+        }
+        renderItem={({ item }) => (
+          <FeedCard
+            item={item}
+            photoUrl={item.image_path ? urls[item.image_path] : undefined}
+            avatarUrl={item.avatar_url ? avatars[item.avatar_url] : undefined}
+            onPress={() =>
+              router.push({ pathname: "/post/[id]", params: { id: item.id } })
+            }
+            onAuthorPress={() =>
+              item.user_id === userId
+                ? router.push("/(tabs)/profile")
+                : router.push({
+                    pathname: "/friend/[id]",
+                    params: { id: item.user_id },
+                  })
+            }
+            onOptions={() => options(item)}
+            onChanged={() => void refreshVisit(item)}
+          />
+        )}
+      />
+    </>
   );
 }
 
@@ -148,58 +238,20 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   content: {
+    gap: spacing.md,
     padding: spacing.md,
-    gap: spacing.sm,
   },
-  header: {
-    gap: spacing.sm,
-  },
-  section: {
-    gap: spacing.sm,
-    marginTop: spacing.md,
-  },
-  sectionTitle: {
+  intro: {
     color: colors.muted,
-    fontSize: 13,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-  },
-  card: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: 12,
-    borderWidth: 1,
-    gap: spacing.xs,
-    padding: spacing.md,
-  },
-  cardMuted: {
-    backgroundColor: 'transparent',
-    borderColor: colors.border,
-    borderRadius: 12,
-    borderWidth: 1,
-    padding: spacing.md,
-  },
-  name: {
-    color: colors.text,
-    fontSize: 17,
-    fontWeight: '700',
-  },
-  barName: {
-    color: colors.accent,
-    fontSize: 16,
+    fontSize: 14,
   },
   muted: {
     color: colors.muted,
   },
-  actions: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: spacing.sm,
-  },
-  action: {
-    flex: 1,
-  },
   error: {
     color: colors.danger,
+  },
+  spinner: {
+    marginVertical: spacing.md,
   },
 });

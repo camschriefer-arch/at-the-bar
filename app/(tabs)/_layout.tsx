@@ -7,6 +7,10 @@ import { colors } from '../../lib/theme';
 type TabIconProps = { color: ColorValue; focused: boolean; size: number };
 
 // Filled while the tab is open, outlined otherwise.
+function FeedIcon({ color, focused, size }: TabIconProps) {
+  return <Ionicons name={focused ? 'beer' : 'beer-outline'} color={color} size={size} />;
+}
+
 function FriendsIcon({ color, focused, size }: TabIconProps) {
   return <Ionicons name={focused ? 'people' : 'people-outline'} color={color} size={size} />;
 }
@@ -30,7 +34,8 @@ export default function TabsLayout() {
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.muted,
       }}>
-      <Tabs.Screen name="index" options={{ title: 'Friends', tabBarIcon: FriendsIcon }} />
+      <Tabs.Screen name="index" options={{ title: 'Feed', tabBarIcon: FeedIcon }} />
+      <Tabs.Screen name="friends" options={{ title: 'Friends', tabBarIcon: FriendsIcon }} />
       <Tabs.Screen name="invite" options={{ title: 'Invite', tabBarIcon: InviteIcon }} />
       <Tabs.Screen name="profile" options={{ title: 'You', tabBarIcon: ProfileIcon }} />
     </Tabs>

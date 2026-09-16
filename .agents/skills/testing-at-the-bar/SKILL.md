@@ -61,6 +61,23 @@ Gotchas:
 - `adb shell pm clear com.atthebar.app` (the way to flush the cached bar tile in AsyncStorage) also
   revokes location permission, and a nearby-bar list of zero looks exactly like a broken feature.
   Re-grant `ACCESS_FINE_LOCATION` / `ACCESS_COARSE_LOCATION` with `pm grant` afterwards.
+- **Sign-in "Invalid login credentials" is usually the harness, not the app.** The keyboard covers
+  the Sign in button, so the tap lands on an IME key and the stale error text from a previous
+  attempt stays on screen — it looks like a rejected login that never happened. Confirm whether a
+  request was even sent with `docker logs supabase_kong_at-the-bar --since 2m` (look for
+  `POST /auth/v1/token` with `okhttp/...` as the user agent; a `Python-urllib` line is your own
+  control call). Always `keyevent 4` before tapping Sign in, and verify the password field's bullet
+  count matches the password length before submitting — `input keycombination 113 29` + `keyevent 67`
+  sometimes leaves a stray character behind. A reusable helper lives at `/home/ubuntu/signin.sh`.
+- **`adb shell input text` silently truncates long strings** (~20–40 chars observed). For anything
+  longer, type in ~50-char chunks in a loop and re-dump to check the field length. This is also how
+  to test a `maxLength` cap: type 700 chars in chunks and assert the field stops at the limit.
+- The expo-image-picker crop screen (`ExpoCropImageActivity`) sometimes stops accepting taps on
+  `CROP` for a given image (retries, long-press and swipe-taps all no-op). `keyevent 4` to cancel
+  and re-run the pick with a different/smaller library image — it then completes normally.
+- The emulator's synthetic back camera **does** work for `launchCameraAsync`: the flow is
+  Shutter → `Done` → crop → `CROP`. The captured scene is low-colour (~1–7k unique colours), so
+  judge "a real photo was attached" by the placeholder text disappearing, not by colour count alone.
 
 ## Faking GPS
 

@@ -57,7 +57,7 @@ and nothing is ever recorded for a venue you did not confirm.
 | Venues you checked into before, and when | The "frequently visited" list on your profile | You and your accepted friends |
 | Friends and pending invites | Deciding who may see your status | You and the person on the other side |
 | Drink photos, venue name, rating, notes | Your gallery, and the feed your friends see | You and your accepted friends |
-| Comments and emoji reactions you leave | Showing them under the photo | You and everyone who can see that photo |
+| Comments and emoji reactions you leave | Showing them under the photo, arrival or departure | You and everyone who can see that feed item |
 | People you blocked, posts you reported | Moderation | You, and whoever moderates reports |
 | Push notification token | Sending you the "are you here?" prompt and letting friends know you are out | Us only |
 

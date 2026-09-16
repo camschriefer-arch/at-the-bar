@@ -29,6 +29,52 @@ export async function fetchReactions(postId: string): Promise<DrinkPostReaction[
   return (data ?? []) as DrinkPostReaction[];
 }
 
+/**
+ * A visit has two ends and the feed shows both, so a comment or a reaction
+ * belongs to one of them rather than to the visit as a whole.
+ */
+export type VisitEnd = 'check_in' | 'check_out';
+
+export async function addVisitComment(
+  visitId: string,
+  kind: VisitEnd,
+  authorId: string,
+  body: string
+): Promise<void> {
+  const { error } = await supabase
+    .from('visit_comments')
+    .insert({ visit_id: visitId, kind, author_id: authorId, body: body.trim() });
+
+  if (error) throw error;
+}
+
+export async function deleteVisitComment(commentId: string): Promise<void> {
+  const { error } = await supabase.from('visit_comments').delete().eq('id', commentId);
+  if (error) throw error;
+}
+
+export async function toggleVisitReaction(
+  visitId: string,
+  kind: VisitEnd,
+  userId: string,
+  emoji: string,
+  reacted: boolean
+): Promise<void> {
+  const { error } = reacted
+    ? await supabase
+        .from('visit_reactions')
+        .delete()
+        .eq('visit_id', visitId)
+        .eq('kind', kind)
+        .eq('user_id', userId)
+        .eq('emoji', emoji)
+    : await supabase
+        .from('visit_reactions')
+        .insert({ visit_id: visitId, kind, user_id: userId, emoji });
+
+  if (error) throw error;
+}
+
 /** Adds your reaction, or takes it back when you had already left that one. */
 export async function toggleReaction(
   postId: string,

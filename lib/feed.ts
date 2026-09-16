@@ -23,6 +23,24 @@ export async function fetchFeedPost(postId: string): Promise<FeedItem | null> {
   return ((data ?? []) as FeedItem[])[0] ?? null;
 }
 
+/**
+ * One end of one visit, refetched after a comment or a reaction so the card is
+ * replaced in place rather than the whole page being pulled out from under the
+ * reader.
+ */
+export async function fetchFeedVisit(
+  visitId: string,
+  kind: 'check_in' | 'check_out'
+): Promise<FeedItem | null> {
+  const { data, error } = await supabase.rpc('feed_visit', {
+    p_visit_id: visitId,
+    p_kind: kind,
+  });
+
+  if (error) throw error;
+  return ((data ?? []) as FeedItem[])[0] ?? null;
+}
+
 /** A check-in and a post can share an id, so a feed key carries both. */
 export function feedKey(item: FeedItem): string {
   return `${item.kind}:${item.id}`;

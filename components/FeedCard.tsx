@@ -3,6 +3,7 @@ import { Image } from 'expo-image';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Avatar } from './Avatar';
+import { FeedSocial } from './FeedSocial';
 import { Stars } from './Stars';
 import { colors, spacing } from '../lib/theme';
 import type { FeedItem } from '../lib/types';
@@ -41,6 +42,8 @@ type FeedCardProps = {
   onPress: () => void;
   onAuthorPress: () => void;
   onOptions: () => void;
+  /** Reloads the page after a comment or a reaction on a visit. */
+  onChanged: () => void;
 };
 
 export function FeedCard({
@@ -50,6 +53,7 @@ export function FeedCard({
   onPress,
   onAuthorPress,
   onOptions,
+  onChanged,
 }: FeedCardProps) {
   const isVisit = item.kind !== 'post';
 
@@ -90,6 +94,7 @@ export function FeedCard({
         <>
           <Text style={styles.place}>{visit(item)}</Text>
           {town(item) ? <Text style={styles.town}>{town(item)}</Text> : null}
+          <FeedSocial item={item} onChanged={onChanged} />
         </>
       ) : place(item) ? (
         <Text style={styles.place}>{place(item)}</Text>

@@ -76,10 +76,22 @@ export type DrinkPostDraft = {
   rating: number;
 };
 
+/** A comment as the feed carries it, alongside the item it hangs under. */
+export type FeedComment = {
+  id: string;
+  author_id: string;
+  display_name: string;
+  body: string;
+  created_at: string;
+};
+
 /**
  * A row of the feed. A post carries its photo and drink, a check-in or a
  * check-out only the venue; all are a friend's, or your own. A visit yields one
  * of each, keyed by kind, so the two ends of it sit where they happened.
+ *
+ * The thread and the emoji tally ride along with the row, so a card can be read
+ * and replied to without opening anything.
  */
 export type FeedItem = {
   kind: 'post' | 'check_in' | 'check_out';
@@ -97,6 +109,8 @@ export type FeedItem = {
   image_path: string | null;
   comments: number;
   reactions: number;
+  comment_list: FeedComment[];
+  reaction_list: DrinkPostReaction[];
   created_at: string;
 };
 

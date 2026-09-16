@@ -12,7 +12,12 @@ import {
 import { FeedCard } from "../../components/FeedCard";
 import { ReportModal } from "../../components/ReportModal";
 import { useAuth } from "../../lib/AuthProvider";
-import { FEED_PAGE_SIZE, fetchFeed, feedKey } from "../../lib/feed";
+import {
+  FEED_PAGE_SIZE,
+  fetchFeed,
+  fetchFeedVisit,
+  feedKey,
+} from "../../lib/feed";
 import { blockUser } from "../../lib/moderation";
 import { signedAvatarUrlsFor, signedDrinkUrlsFor } from "../../lib/photos";
 import { colors, spacing } from "../../lib/theme";
@@ -91,6 +96,27 @@ export default function FeedScreen() {
     }
     setLoadingMore(false);
   };
+
+  /**
+   * A comment or a reaction changes one card, so only that card is refetched:
+   * reloading the first page would drop everything paged in below it.
+   */
+  const refreshVisit = useCallback(async (item: FeedItem) => {
+    if (item.kind === "post") return;
+    try {
+      const fresh = await fetchFeedVisit(item.id, item.kind);
+      if (!fresh) return;
+      setItems((previous) =>
+        previous.map((row) =>
+          row.kind === fresh.kind && row.id === fresh.id ? fresh : row,
+        ),
+      );
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : "Could not refresh that post",
+      );
+    }
+  }, []);
 
   const block = (item: FeedItem) => {
     Alert.alert(
@@ -199,6 +225,7 @@ export default function FeedScreen() {
                   })
             }
             onOptions={() => options(item)}
+            onChanged={() => void refreshVisit(item)}
           />
         )}
       />

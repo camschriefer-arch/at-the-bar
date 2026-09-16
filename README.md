@@ -10,6 +10,7 @@ iOS + Android app that shows which of your friends are out at a bar right now, a
 - Friends get a push notification when you arrive at or leave a bar ("Bob is at the bar"), naming you but not the bar.
 - Posting a drink pushes "Check out Bob's latest beer post at Jake & Joe's!" to the same friends, with the photo as a preview; tapping it opens that photo on Bob's profile.
 - Removing a friend cuts the tie both ways; they get an email about it, never a push.
+- The Feed tab is one stream of your friends' check-ins and drink photos, newest first, with comments and emoji reactions on the photos. It shows accepted friends and you, nobody else — long-press a card to report a post or block its author.
 - Your profile carries a photo of you and a gallery of the drinks you post (bar, drink, note, 1–5 stars), which accepted friends browse from your friend screen.
 - When you are not at a bar, friends see nothing at all.
 

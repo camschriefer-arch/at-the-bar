@@ -76,6 +76,29 @@ export type DrinkPostDraft = {
   rating: number;
 };
 
+/**
+ * A row of the feed. A post carries its photo and drink, a check-in only the
+ * venue someone arrived at; both are a friend's, or your own.
+ */
+export type FeedItem = {
+  kind: 'post' | 'check_in';
+  id: string;
+  user_id: string;
+  display_name: string;
+  avatar_url: string | null;
+  bar_id: string | null;
+  bar_name: string | null;
+  bar_city: string | null;
+  bar_state: string | null;
+  beer_name: string | null;
+  description: string | null;
+  rating: number | null;
+  image_path: string | null;
+  comments: number;
+  reactions: number;
+  created_at: string;
+};
+
 export type PublicProfile = {
   id: string;
   display_name: string;

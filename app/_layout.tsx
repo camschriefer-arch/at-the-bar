@@ -154,6 +154,7 @@ function RootNavigator() {
       <Stack.Screen name="location-access" options={{ headerShown: false }} />
       <Stack.Screen name="friend/[id]" options={{ title: 'Friend', headerBackTitle: 'Back' }} />
       <Stack.Screen name="user/[id]" options={{ title: 'Profile', headerBackTitle: 'Back' }} />
+      <Stack.Screen name="post/[id]" options={{ title: 'Post', headerBackTitle: 'Back' }} />
       <Stack.Screen name="redeem" options={{ title: 'Invite' }} />
     </Stack>
   );

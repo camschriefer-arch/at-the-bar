@@ -56,7 +56,9 @@ and nothing is ever recorded for a venue you did not confirm.
 | Current venue and arrival time | The core feature, only while you are checked in | You and your accepted friends |
 | Venues you checked into before, and when | The "frequently visited" list on your profile | You and your accepted friends |
 | Friends and pending invites | Deciding who may see your status | You and the person on the other side |
-| Drink photos, venue name, rating, notes | Your gallery | You and your accepted friends |
+| Drink photos, venue name, rating, notes | Your gallery, and the feed your friends see | You and your accepted friends |
+| Comments and emoji reactions you leave | Showing them under the photo | You and everyone who can see that photo |
+| People you blocked, posts you reported | Moderation | You, and whoever moderates reports |
 | Push notification token | Sending you the "are you here?" prompt and letting friends know you are out | Us only |
 
 Photos are held in private storage and served through short-lived signed links;
@@ -67,7 +69,8 @@ they are not publicly addressable on the internet.
 - We never store your coordinates.
 - We never record a place you did not explicitly confirm, and we keep no trace of
   anywhere that is not a venue in the public catalog.
-- We never share your location with anyone who is not an accepted friend.
+- We never share your location with anyone who is not an accepted friend. The
+  feed is no exception: check-ins and photos reach your accepted friends only.
 - We never show a friend where you are when you are not checked in — they only
   see that you are not out.
 - We do not sell or rent personal data, use it for advertising, or use it to

@@ -49,6 +49,9 @@ More than 250,000 bars, pubs and restaurants nationwide, refreshed every month f
 KEEP THE NIGHT
 Photograph what you're drinking, rate it, and keep a gallery of every good round — visible to your friends, nobody else.
 
+ONE FEED, JUST YOUR FRIENDS
+The feed collects your friends' check-ins and photos in one place, newest first, and you can comment or react on any of them. There is no public timeline, no strangers and no algorithm — only the people who accepted your invite.
+
 At The Bar is for people over 21 and involves places that serve alcohol. Please drink responsibly, and don't check in while driving.
 ```
 
@@ -94,8 +97,11 @@ declaring Precise Location because the app reads it on the device.
 WHY THIS APP USES BACKGROUND LOCATION
 The app's single purpose is letting a user tell accepted friends that they are out at a bar. Background location is required to notice that the user has arrived somewhere: the device compares its position, on-device, against a catalog of bars, and after the user has remained within about 0.1 miles of one for five minutes it asks them to confirm. Coordinates are never transmitted to the server. Only the identifier of the venue the user confirms is stored: as the current status, which is cleared when they leave, and as a check-in record that feeds the "frequently visited" list on their profile, which the user can delete per venue. The app has no ability to record or display a user's location at any other time.
 
+MODERATING USER CONTENT
+The only user-generated content is drink photos, their notes, and comments and emoji reactions on them, and all of it is visible to accepted friends only. Every post in the feed can be reported by anyone who can see it (long-press the card, or the post screen) and every author can be blocked, which hides both people's posts and comments from each other. Reports reach the developer, who removes content and accounts.
+
 HOW TO TEST
-Sign in with the demo account below. The Friends tab shows a seeded friend who is checked in at a venue; tapping them shows the venue and a map pin, which is the only location data any user can see about another. The You tab has "Check in now", which performs the location read immediately rather than waiting for the five-minute dwell, and shows the confirmation prompt. The Invite tab creates a shareable invite link.
+Sign in with the demo account below. The Feed tab shows a seeded friend's check-ins and photos, with report and block behind a long press. The Friends tab shows that friend checked in at a venue; tapping them shows the venue and a map pin, which is the only location data any user can see about another. The You tab has "Check in now", which performs the location read immediately rather than waiting for the five-minute dwell, and shows the confirmation prompt. The Invite tab creates a shareable invite link.
 
 Demo account: <email> / <password>
 ```

@@ -108,15 +108,34 @@ export async function signedAvatarUrl(path: string | null): Promise<string | nul
   return path ? signedUrl(AVATAR_BUCKET, path) : null;
 }
 
-export async function signedDrinkUrls(posts: DrinkPost[]): Promise<Record<string, string>> {
-  if (posts.length === 0) return {};
+/** Faces on the feed, where a stranger's avatar sits next to their post. */
+export async function signedAvatarUrlsFor(paths: string[]): Promise<Record<string, string>> {
+  if (paths.length === 0) return {};
+
+  const { data, error } = await supabase.storage
+    .from(AVATAR_BUCKET)
+    .createSignedUrls(paths, SIGNED_URL_TTL_SECONDS);
+
+  if (error) throw error;
+
+  const urls: Record<string, string> = {};
+  for (const entry of data ?? []) {
+    if (entry.path && entry.signedUrl) urls[entry.path] = entry.signedUrl;
+  }
+  return urls;
+}
+
+export function signedDrinkUrls(posts: DrinkPost[]): Promise<Record<string, string>> {
+  return signedDrinkUrlsFor(posts.map((post) => post.image_path));
+}
+
+/** Signs whatever drink photos are on screen, feed rows included. */
+export async function signedDrinkUrlsFor(paths: string[]): Promise<Record<string, string>> {
+  if (paths.length === 0) return {};
 
   const { data, error } = await supabase.storage
     .from(DRINK_BUCKET)
-    .createSignedUrls(
-      posts.map((post) => post.image_path),
-      SIGNED_URL_TTL_SECONDS
-    );
+    .createSignedUrls(paths, SIGNED_URL_TTL_SECONDS);
 
   if (error) throw error;
 

@@ -78,6 +78,13 @@ Gotchas:
 - The emulator's synthetic back camera **does** work for `launchCameraAsync`: the flow is
   Shutter → `Done` → crop → `CROP`. The captured scene is low-colour (~1–7k unique colours), so
   judge "a real photo was attached" by the placeholder text disappearing, not by colour count alone.
+- "Check in now" answering *"No bars, pubs or restaurants close enough"* usually means the mock-GPS
+  loop is not running, not that the catalog is empty. Restart it (`/home/ubuntu/mockloc.sh <lat>
+  <lng> <secs>` with a seeded venue's `select name, lat, lng from bars`) before exercising
+  check-in or check-out.
+- "Process system isn't responding" is a host-memory ANR and *Wait* never dismisses it. Recover with
+  `adb shell am force-stop com.atthebar.app` then
+  `adb shell monkey -p com.atthebar.app -c android.intent.category.LAUNCHER 1`.
 
 ## Faking GPS
 

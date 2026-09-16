@@ -1,24 +1,32 @@
-import { Image } from 'expo-image';
-import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image } from "expo-image";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import { useCallback, useState } from "react";
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
-import { Avatar } from '../../components/Avatar';
-import { PostSocial } from '../../components/PostSocial';
-import { Stars } from '../../components/Stars';
-import { useAuth } from '../../lib/AuthProvider';
-import { fetchFeedPost } from '../../lib/feed';
-import { blockUser, REPORT_REASONS, reportPost } from '../../lib/moderation';
-import { signedAvatarUrl, signedDrinkUrlsFor } from '../../lib/photos';
-import { colors, spacing } from '../../lib/theme';
-import type { FeedItem } from '../../lib/types';
+import { Avatar } from "../../components/Avatar";
+import { PostSocial } from "../../components/PostSocial";
+import { ReportModal } from "../../components/ReportModal";
+import { Stars } from "../../components/Stars";
+import { useAuth } from "../../lib/AuthProvider";
+import { fetchFeedPost } from "../../lib/feed";
+import { blockUser } from "../../lib/moderation";
+import { signedAvatarUrl, signedDrinkUrlsFor } from "../../lib/photos";
+import { colors, spacing } from "../../lib/theme";
+import type { FeedItem } from "../../lib/types";
 
 const postedOn = (iso: string) =>
   new Date(iso).toLocaleString(undefined, {
-    month: 'long',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
+    month: "long",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
   });
 
 export default function PostScreen() {
@@ -30,6 +38,7 @@ export default function PostScreen() {
   const [post, setPost] = useState<FeedItem | null>(null);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [reporting, setReporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -37,7 +46,7 @@ export default function PostScreen() {
     try {
       const row = await fetchFeedPost(id);
       setPost(row);
-      setError(row ? null : 'This post is no longer available.');
+      setError(row ? null : "This post is no longer available.");
 
       if (row?.image_path) {
         const urls = await signedDrinkUrlsFor([row.image_path]);
@@ -45,61 +54,48 @@ export default function PostScreen() {
       }
       setAvatarUrl(await signedAvatarUrl(row?.avatar_url ?? null));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not load the post');
+      setError(
+        cause instanceof Error ? cause.message : "Could not load the post",
+      );
     }
   }, [id]);
 
   useFocusEffect(
     useCallback(() => {
       void load();
-    }, [load])
+    }, [load]),
   );
-
-  const report = () => {
-    if (!post) return;
-
-    Alert.alert('Report this post', "Tell us what's wrong with it.", [
-      ...REPORT_REASONS.map((reason) => ({
-        text: reason,
-        onPress: () => {
-          void reportPost(post.id, reason)
-            .then(() => Alert.alert('Reported', 'Thanks — we will take a look.'))
-            .catch((cause: unknown) =>
-              Alert.alert('Could not report', cause instanceof Error ? cause.message : 'Try again')
-            );
-        },
-      })),
-      { text: 'Cancel', style: 'cancel' as const },
-    ]);
-  };
 
   const block = () => {
     if (!post) return;
 
     Alert.alert(
       `Block ${post.display_name}?`,
-      'You will not see their posts or comments, and they will not see yours.',
+      "You will not see their posts or comments, and they will not see yours.",
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: "Cancel", style: "cancel" },
         {
-          text: 'Block',
-          style: 'destructive',
+          text: "Block",
+          style: "destructive",
           onPress: () => {
             void blockUser(post.user_id)
               .then(() => router.back())
               .catch((cause: unknown) =>
-                Alert.alert('Could not block', cause instanceof Error ? cause.message : 'Try again')
+                Alert.alert(
+                  "Could not block",
+                  cause instanceof Error ? cause.message : "Try again",
+                ),
               );
           },
         },
-      ]
+      ],
     );
   };
 
   if (!post) {
     return (
       <View style={styles.empty}>
-        <Text style={styles.muted}>{error ?? 'Loading…'}</Text>
+        <Text style={styles.muted}>{error ?? "Loading…"}</Text>
       </View>
     );
   }
@@ -110,7 +106,16 @@ export default function PostScreen() {
       contentContainerStyle={styles.content}
       automaticallyAdjustKeyboardInsets
       keyboardDismissMode="interactive"
-      keyboardShouldPersistTaps="handled">
+      keyboardShouldPersistTaps="handled"
+    >
+      <ReportModal
+        postId={reporting ? post.id : null}
+        onClose={() => setReporting(false)}
+        onReported={() =>
+          Alert.alert("Reported", "Thanks — we will take a look.")
+        }
+      />
+
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
       <Pressable
@@ -119,9 +124,13 @@ export default function PostScreen() {
         style={styles.author}
         onPress={() =>
           post.user_id === userId
-            ? router.push('/(tabs)/profile')
-            : router.push({ pathname: '/friend/[id]', params: { id: post.user_id } })
-        }>
+            ? router.push("/(tabs)/profile")
+            : router.push({
+                pathname: "/friend/[id]",
+                params: { id: post.user_id },
+              })
+        }
+      >
         <Avatar uri={avatarUrl} name={post.display_name} size={44} />
         <View>
           <Text style={styles.name}>{post.display_name}</Text>
@@ -130,21 +139,33 @@ export default function PostScreen() {
       </Pressable>
 
       {photoUrl ? (
-        <Image source={photoUrl} style={styles.photo} contentFit="cover" transition={150} />
+        <Image
+          source={photoUrl}
+          style={styles.photo}
+          contentFit="cover"
+          transition={150}
+        />
       ) : (
         <View style={styles.photo} />
       )}
 
-      {post.beer_name ? <Text style={styles.drink}>{post.beer_name}</Text> : null}
+      {post.beer_name ? (
+        <Text style={styles.drink}>{post.beer_name}</Text>
+      ) : null}
       {post.bar_name ? <Text style={styles.place}>{post.bar_name}</Text> : null}
       {post.rating === null ? null : <Stars rating={post.rating} size={22} />}
-      {post.description ? <Text style={styles.description}>{post.description}</Text> : null}
+      {post.description ? (
+        <Text style={styles.description}>{post.description}</Text>
+      ) : null}
 
       <PostSocial postId={post.id} ownerId={post.user_id} />
 
       {post.user_id === userId ? null : (
         <View style={styles.moderation}>
-          <Pressable accessibilityRole="button" onPress={report}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setReporting(true)}
+          >
             <Text style={styles.danger}>Report post</Text>
           </Pressable>
           <Pressable accessibilityRole="button" onPress={block}>
@@ -165,36 +186,36 @@ const styles = StyleSheet.create({
     padding: spacing.md,
   },
   empty: {
-    alignItems: 'center',
+    alignItems: "center",
     backgroundColor: colors.background,
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   author: {
-    alignItems: 'center',
-    flexDirection: 'row',
+    alignItems: "center",
+    flexDirection: "row",
     gap: spacing.sm,
   },
   name: {
     color: colors.text,
     fontSize: 17,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   photo: {
     aspectRatio: 1,
     backgroundColor: colors.surface,
     borderRadius: 12,
-    width: '100%',
+    width: "100%",
   },
   drink: {
     color: colors.text,
     fontSize: 22,
-    fontWeight: '800',
+    fontWeight: "800",
   },
   place: {
     color: colors.accent,
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   description: {
     color: colors.muted,

@@ -70,7 +70,8 @@ they are not publicly addressable on the internet.
 - We never record a place you did not explicitly confirm, and we keep no trace of
   anywhere that is not a venue in the public catalog.
 - We never share your location with anyone who is not an accepted friend. The
-  feed is no exception: check-ins and photos reach your accepted friends only.
+  feed is no exception: arrivals, departures and photos reach your accepted
+  friends only.
 - We never show a friend where you are when you are not checked in — they only
   see that you are not out.
 - We do not sell or rent personal data, use it for advertising, or use it to

@@ -77,11 +77,12 @@ export type DrinkPostDraft = {
 };
 
 /**
- * A row of the feed. A post carries its photo and drink, a check-in only the
- * venue someone arrived at; both are a friend's, or your own.
+ * A row of the feed. A post carries its photo and drink, a check-in or a
+ * check-out only the venue; all are a friend's, or your own. A visit yields one
+ * of each, keyed by kind, so the two ends of it sit where they happened.
  */
 export type FeedItem = {
-  kind: 'post' | 'check_in';
+  kind: 'post' | 'check_in' | 'check_out';
   id: string;
   user_id: string;
   display_name: string;

@@ -22,6 +22,17 @@ function place(item: FeedItem): string | null {
   return where ? `${item.bar_name} · ${where}` : item.bar_name;
 }
 
+/** "Dan is at Jake n JOES", "Dan has left Jake n JOES". */
+function visit(item: FeedItem): string {
+  const verb = item.kind === 'check_out' ? 'has left' : 'is at';
+  return `${item.display_name} ${verb} ${item.bar_name ?? 'a bar'}`;
+}
+
+function town(item: FeedItem): string | null {
+  const where = [item.bar_city, item.bar_state].filter(Boolean).join(', ');
+  return where || null;
+}
+
 type FeedCardProps = {
   item: FeedItem;
   /** Signed URL for the drink photo; the drinks bucket is private. */
@@ -40,18 +51,16 @@ export function FeedCard({
   onAuthorPress,
   onOptions,
 }: FeedCardProps) {
-  const checkIn = item.kind === 'check_in';
+  const isVisit = item.kind !== 'post';
 
   return (
     <Pressable
-      accessibilityRole={checkIn ? 'text' : 'button'}
+      accessibilityRole={isVisit ? 'text' : 'button'}
       accessibilityLabel={
-        checkIn
-          ? `${item.display_name} is at ${item.bar_name}`
-          : `${item.beer_name} at ${item.bar_name}, by ${item.display_name}`
+        isVisit ? visit(item) : `${item.beer_name} at ${item.bar_name}, by ${item.display_name}`
       }
       style={styles.card}
-      onPress={checkIn ? undefined : onPress}
+      onPress={isVisit ? undefined : onPress}
       onLongPress={onOptions}>
       <View style={styles.header}>
         <Pressable
@@ -63,7 +72,7 @@ export function FeedCard({
           <View style={styles.byline}>
             <Text style={styles.name}>{item.display_name}</Text>
             <Text style={styles.meta}>
-              {checkIn ? 'checked in' : 'posted'} · {age(item.created_at)}
+              {isVisit ? age(item.created_at) : `posted · ${age(item.created_at)}`}
             </Text>
           </View>
         </Pressable>
@@ -77,9 +86,16 @@ export function FeedCard({
         </Pressable>
       </View>
 
-      {place(item) ? <Text style={styles.place}>{place(item)}</Text> : null}
+      {isVisit ? (
+        <>
+          <Text style={styles.place}>{visit(item)}</Text>
+          {town(item) ? <Text style={styles.town}>{town(item)}</Text> : null}
+        </>
+      ) : place(item) ? (
+        <Text style={styles.place}>{place(item)}</Text>
+      ) : null}
 
-      {checkIn ? null : (
+      {isVisit ? null : (
         <>
           {photoUrl ? (
             <Image source={photoUrl} style={styles.photo} contentFit="cover" transition={150} />
@@ -140,6 +156,12 @@ const styles = StyleSheet.create({
     color: colors.accent,
     fontSize: 15,
     fontWeight: '600',
+    paddingHorizontal: spacing.sm,
+    paddingBottom: spacing.sm,
+  },
+  town: {
+    color: colors.muted,
+    fontSize: 13,
     paddingHorizontal: spacing.sm,
     paddingBottom: spacing.sm,
   },

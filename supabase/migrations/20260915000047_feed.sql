@@ -9,6 +9,7 @@
 -- The feed reads newest-first across every friend, not one user at a time.
 create index drink_posts_created_idx on drink_posts (created_at desc);
 create index check_ins_arrived_idx on check_ins (arrived_at desc);
+create index check_ins_departed_idx on check_ins (departed_at desc);
 
 -- Mutual silence: neither person sees the other's posts, comments or check-ins,
 -- and neither can leave anything under the other's photo. The friendship, if
@@ -117,8 +118,9 @@ as $$
   order by c.created_at;
 $$;
 
--- One page of the feed, newest first: your friends' photos and their arrivals,
--- and your own alongside them.
+-- One page of the feed, newest first: your friends' photos and their arrivals
+-- and departures, and your own alongside them. A visit shows up twice, once at
+-- each end, so the feed reads as a night rather than a list of places.
 --
 -- Paged on created_at rather than an offset, because the feed grows at the top
 -- and an offset would repeat rows as it does.
@@ -193,6 +195,31 @@ as $$
     join profiles friend on friend.id = c.user_id
     join bars b on b.id = c.bar_id
     where (c.user_id = auth.uid() or are_friends(auth.uid(), c.user_id))
+      and not is_blocked(c.user_id)
+
+    union all
+
+    select 'check_out' as kind,
+      c.id,
+      c.user_id,
+      friend.display_name,
+      friend.avatar_url,
+      c.bar_id,
+      b.name as bar_name,
+      b.city as bar_city,
+      b.state as bar_state,
+      null::text as beer_name,
+      null::text as description,
+      null::smallint as rating,
+      null::text as image_path,
+      0::bigint as comments,
+      0::bigint as reactions,
+      c.departed_at as created_at
+    from check_ins c
+    join profiles friend on friend.id = c.user_id
+    join bars b on b.id = c.bar_id
+    where c.departed_at is not null
+      and (c.user_id = auth.uid() or are_friends(auth.uid(), c.user_id))
       and not is_blocked(c.user_id)
   )
   select * from items

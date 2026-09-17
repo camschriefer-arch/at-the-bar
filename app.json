@@ -59,6 +59,12 @@
           "isAndroidForegroundServiceEnabled": true
         }
       ],
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "At The Bar shows your contacts so you can pick who to invite. Only the person you pick is read."
+        }
+      ],
       "@bacons/apple-targets"
     ],
     "experiments": {

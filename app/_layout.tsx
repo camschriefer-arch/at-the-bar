@@ -1,7 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { ActivityIndicator, AppState, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
@@ -88,8 +88,19 @@ function RootNavigator() {
   // "Bob is at the bar" says nothing about where; tapping it opens Bob, which
   // only renders his bar if the friendship still allows it.
   const tapped = Notifications.useLastNotificationResponse();
+  const handledTap = useRef<string | null>(null);
   useEffect(() => {
     if (!session || !tapped) return;
+
+    // The hook holds the last response for the life of the app, so anything
+    // that re-runs this effect — a token refresh hands down a new session
+    // object every hour — would navigate all over again and drop the user back
+    // on the notification's screen however many times they pressed back. Each
+    // response is followed once, and then forgotten on both sides.
+    const { identifier } = tapped.notification.request;
+    if (handledTap.current === identifier) return;
+    handledTap.current = identifier;
+    void Notifications.clearLastNotificationResponseAsync();
 
     const { friendId, kind, barId, postId, event } = tapped.notification.request.content
       .data as BarEventPayload;
@@ -113,10 +124,6 @@ function RootNavigator() {
     }
 
     if (kind !== 'venue-confirm' && kind !== 'venue-choose') return;
-
-    // The response outlives its handling, so it is cleared to keep a relaunch
-    // from checking the user in at a restaurant they left hours ago.
-    void Notifications.clearLastNotificationResponseAsync();
 
     if (tapped.actionIdentifier === VENUE_PROMPT_DISMISS) {
       void declinePendingVenue();

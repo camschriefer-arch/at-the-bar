@@ -112,17 +112,22 @@ export async function declinePendingVenue(): Promise<void> {
 }
 
 /**
- * Forgets both quiet periods for a venue the user checked in to by hand: they
- * have just said they do go there, whatever they answered last time.
+ * Forgets the quiet periods in the way of a user who has just checked in. Their
+ * own venue loses both: they have said they do go there, whatever they answered
+ * last time. Every other venue loses the prompt cooldown, which is only there
+ * so an unanswered question does not repeat — a check-in answers it, and the
+ * next bar of the night is usually one of the neighbours that went quiet
+ * alongside this one. "Not here" is left standing everywhere else, because that
+ * answer was about those venues.
  */
 export async function allowVenue(barId: string): Promise<void> {
-  for (const key of [PROMPTED_KEY, DECLINED_KEY]) {
-    const quiet = await readQuiet(key);
-    if (quiet[barId] === undefined) continue;
+  await AsyncStorage.removeItem(PROMPTED_KEY);
 
-    delete quiet[barId];
-    await AsyncStorage.setItem(key, JSON.stringify(quiet));
-  }
+  const declined = await readQuiet(DECLINED_KEY);
+  if (declined[barId] === undefined) return;
+
+  delete declined[barId];
+  await AsyncStorage.setItem(DECLINED_KEY, JSON.stringify(declined));
 }
 
 /**

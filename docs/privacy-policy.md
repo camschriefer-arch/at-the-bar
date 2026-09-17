@@ -49,11 +49,9 @@ and nothing is ever recorded for a venue you did not confirm.
 
 ## Contacts
 
-The Invite tab can open your phone's own contact picker so you do not have to
-type a friend's email. The app never reads your address book: the picker runs on
-your device, and only the single person you tap is handed back, whose email or
-phone number is used once to send that invite. We do not upload, store or match
-your contacts, so we cannot tell you which of them already use the app.
+The app has no access to your contacts at all. Invites are addressed by hand:
+you type a friend's email, or you send them a link. We cannot tell you which of
+your contacts already use the app, because we never see them.
 
 ## What we store about you
 

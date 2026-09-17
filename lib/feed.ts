@@ -41,6 +41,20 @@ export async function fetchFeedVisit(
   return ((data ?? []) as FeedItem[])[0] ?? null;
 }
 
+/**
+ * Puts someone else's photo on your own feed, where your accepted friends see
+ * it. The photo, and the one thread under it, stay theirs.
+ */
+export async function sharePost(postId: string): Promise<void> {
+  const { error } = await supabase.rpc('share_post', { p_post_id: postId });
+  if (error) throw error;
+}
+
+export async function unsharePost(postId: string): Promise<void> {
+  const { error } = await supabase.rpc('unshare_post', { p_post_id: postId });
+  if (error) throw error;
+}
+
 /** A check-in and a post can share an id, so a feed key carries both. */
 export function feedKey(item: FeedItem): string {
   return `${item.kind}:${item.id}`;

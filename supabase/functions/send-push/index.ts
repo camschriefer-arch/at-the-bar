@@ -20,7 +20,14 @@ type OutboxRow = {
   id: number;
   recipient_id: string;
   actor_id: string;
-  event: 'arrived' | 'left' | 'posted' | 'requested' | 'commented' | 'reacted';
+  event:
+    | 'arrived'
+    | 'left'
+    | 'posted'
+    | 'requested'
+    | 'commented'
+    | 'reacted'
+    | 'reshared';
   body: string;
   token: string;
   post_id: string | null;

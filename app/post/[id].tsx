@@ -15,7 +15,7 @@ import { PostSocial } from "../../components/PostSocial";
 import { ReportModal } from "../../components/ReportModal";
 import { Stars } from "../../components/Stars";
 import { useAuth } from "../../lib/AuthProvider";
-import { fetchFeedPost } from "../../lib/feed";
+import { fetchFeedPost, sharePost, unsharePost } from "../../lib/feed";
 import { blockUser } from "../../lib/moderation";
 import { signedAvatarUrl, signedDrinkUrlsFor } from "../../lib/photos";
 import { colors, spacing } from "../../lib/theme";
@@ -39,6 +39,7 @@ export default function PostScreen() {
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [reporting, setReporting] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -65,6 +66,32 @@ export default function PostScreen() {
       void load();
     }, [load]),
   );
+
+  /**
+   * Puts the photo on your own feed for your friends. The thread underneath is
+   * the photographer's either way, which is why nothing about this screen
+   * changes but the button.
+   */
+  const share = async () => {
+    if (!post) return;
+
+    const shared = post.shared_by_me;
+    setSharing(true);
+    try {
+      if (shared) {
+        await unsharePost(post.id);
+      } else {
+        await sharePost(post.id);
+      }
+      setPost({ ...post, shared_by_me: !shared });
+    } catch (cause) {
+      Alert.alert(
+        shared ? "Could not remove that" : "Could not share that",
+        cause instanceof Error ? cause.message : "Try again",
+      );
+    }
+    setSharing(false);
+  };
 
   const block = () => {
     if (!post) return;
@@ -158,6 +185,26 @@ export default function PostScreen() {
         <Text style={styles.description}>{post.description}</Text>
       ) : null}
 
+      {post.user_id === userId ? null : (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={
+            post.shared_by_me
+              ? "Remove this from your feed"
+              : "Share with your friends"
+          }
+          disabled={sharing}
+          style={[styles.share, sharing && styles.sharing]}
+          onPress={() => void share()}
+        >
+          <Text style={styles.shareLabel}>
+            {post.shared_by_me
+              ? "Shared with your friends · remove"
+              : "Share with your friends"}
+          </Text>
+        </Pressable>
+      )}
+
       <PostSocial postId={post.id} ownerId={post.user_id} />
 
       {post.user_id === userId ? null : (
@@ -220,6 +267,23 @@ const styles = StyleSheet.create({
   description: {
     color: colors.muted,
     fontSize: 15,
+  },
+  share: {
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginTop: spacing.xs,
+    paddingVertical: spacing.sm,
+  },
+  sharing: {
+    opacity: 0.6,
+  },
+  shareLabel: {
+    color: colors.accent,
+    fontSize: 15,
+    fontWeight: "700",
   },
   muted: {
     color: colors.muted,

@@ -44,6 +44,10 @@ type FeedCardProps = {
   onOptions: () => void;
   /** Reloads the page after a comment or a reaction on a visit. */
   onChanged: () => void;
+  /** Left out for your own photo, which is on your feed already. */
+  onShare?: () => void;
+  /** Whether the share this card is of is yours. */
+  sharedByYou?: boolean;
 };
 
 export function FeedCard({
@@ -54,8 +58,16 @@ export function FeedCard({
   onAuthorPress,
   onOptions,
   onChanged,
+  onShare,
+  sharedByYou,
 }: FeedCardProps) {
-  const isVisit = item.kind !== 'post';
+  const isVisit = item.kind === 'check_in' || item.kind === 'check_out';
+  const sharedBy =
+    item.kind !== 'reshare'
+      ? null
+      : sharedByYou
+        ? 'You shared this'
+        : `${item.sharer_name} shared this`;
 
   return (
     <Pressable
@@ -66,6 +78,13 @@ export function FeedCard({
       style={styles.card}
       onPress={isVisit ? undefined : onPress}
       onLongPress={onOptions}>
+      {sharedBy ? (
+        <View style={styles.shared}>
+          <Ionicons name="repeat" size={15} color={colors.muted} />
+          <Text style={styles.sharedBy}>{sharedBy}</Text>
+        </View>
+      ) : null}
+
       <View style={styles.header}>
         <Pressable
           accessibilityRole="button"
@@ -76,7 +95,9 @@ export function FeedCard({
           <View style={styles.byline}>
             <Text style={styles.name}>{item.display_name}</Text>
             <Text style={styles.meta}>
-              {isVisit ? age(item.created_at) : `posted · ${age(item.created_at)}`}
+              {isVisit
+                ? age(item.created_at)
+                : `${item.kind === 'reshare' ? 'shared' : 'posted'} · ${age(item.created_at)}`}
             </Text>
           </View>
         </Pressable>
@@ -116,6 +137,26 @@ export function FeedCard({
               {item.reactions} {item.reactions === 1 ? 'reaction' : 'reactions'} · {item.comments}{' '}
               {item.comments === 1 ? 'comment' : 'comments'}
             </Text>
+
+            {onShare ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={
+                  item.shared_by_me ? 'Remove this from your feed' : 'Share with your friends'
+                }
+                hitSlop={spacing.xs}
+                style={({ pressed }) => [styles.share, pressed && styles.sharePressed]}
+                onPress={onShare}>
+                <Ionicons
+                  name="repeat"
+                  size={18}
+                  color={item.shared_by_me ? colors.accent : colors.muted}
+                />
+                <Text style={[styles.shareLabel, item.shared_by_me && styles.shareLabelOn]}>
+                  {item.shared_by_me ? 'Shared with your friends' : 'Share'}
+                </Text>
+              </Pressable>
+            ) : null}
           </View>
         </>
       )}
@@ -191,5 +232,37 @@ const styles = StyleSheet.create({
   counts: {
     color: colors.muted,
     fontSize: 13,
+  },
+  shared: {
+    alignItems: 'center',
+    borderBottomColor: colors.border,
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  sharedBy: {
+    color: colors.muted,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  share: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    gap: spacing.xs,
+    paddingVertical: spacing.xs,
+  },
+  sharePressed: {
+    opacity: 0.6,
+  },
+  shareLabel: {
+    color: colors.muted,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  shareLabelOn: {
+    color: colors.accent,
   },
 });

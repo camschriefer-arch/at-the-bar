@@ -56,7 +56,7 @@ and nothing is ever recorded for a venue you did not confirm.
 | Current venue and arrival time | The core feature, only while you are checked in | You and your accepted friends |
 | Venues you checked into before, and when | The "frequently visited" list on your profile | You and your accepted friends |
 | Friends and pending invites | Deciding who may see your status | You and the person on the other side |
-| Drink photos, venue name, rating, notes | Your gallery, and the feed your friends see | You and your accepted friends |
+| Drink photos, venue name, rating, notes | Your gallery, and the feed your friends see | You and your accepted friends, plus the accepted friends of anyone who shares the photo |
 | Comments and emoji reactions you leave | Showing them under the photo, arrival or departure | You and everyone who can see that feed item |
 | People you blocked, posts you reported | Moderation | You, and whoever moderates reports |
 | Push notification token | Sending you the "are you here?" prompt and letting friends know you are out | Us only |
@@ -69,9 +69,16 @@ they are not publicly addressable on the internet.
 - We never store your coordinates.
 - We never record a place you did not explicitly confirm, and we keep no trace of
   anywhere that is not a venue in the public catalog.
-- We never share your location with anyone who is not an accepted friend. The
-  feed is no exception: arrivals, departures and photos reach your accepted
+- We never share your live status with anyone who is not an accepted friend:
+  where you are checked in, and your arrivals and departures, reach your accepted
   friends only.
+- We never make a photo public. A friend who can see one of your photos can share
+  it onto their own feed, which shows it — with your name, and the venue if you
+  named one — to their accepted friends. Nobody sees a photo without someone they
+  accepted putting it in front of them, and any share can be taken back; but a
+  person the share reached can share it on in turn, so a photo can travel further
+  than your own friends. If you would rather one did not travel, delete it — the
+  shares of it go with it.
 - We never show a friend where you are when you are not checked in — they only
   see that you are not out.
 - We do not sell or rent personal data, use it for advertising, or use it to

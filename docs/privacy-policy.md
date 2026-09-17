@@ -47,6 +47,14 @@ venue in the public catalog, plus the time you arrived there. Closing the app,
 tapping "Go offline", or revoking location permission stops the process entirely,
 and nothing is ever recorded for a venue you did not confirm.
 
+## Contacts
+
+The Invite tab can open your phone's own contact picker so you do not have to
+type a friend's email. The app never reads your address book: the picker runs on
+your device, and only the single person you tap is handed back, whose email or
+phone number is used once to send that invite. We do not upload, store or match
+your contacts, so we cannot tell you which of them already use the app.
+
 ## What we store about you
 
 | Data | Why | Who can see it |
@@ -67,6 +75,7 @@ they are not publicly addressable on the internet.
 ## What we never do
 
 - We never store your coordinates.
+- We never upload your address book, in whole or as hashes.
 - We never record a place you did not explicitly confirm, and we keep no trace of
   anywhere that is not a venue in the public catalog.
 - We never share your location with anyone who is not an accepted friend. The

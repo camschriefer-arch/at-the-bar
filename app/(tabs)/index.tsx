@@ -17,6 +17,8 @@ import {
   fetchFeed,
   fetchFeedVisit,
   feedKey,
+  sharePost,
+  unsharePost,
 } from "../../lib/feed";
 import { blockUser } from "../../lib/moderation";
 import { signedAvatarUrlsFor, signedDrinkUrlsFor } from "../../lib/photos";
@@ -102,7 +104,7 @@ export default function FeedScreen() {
    * reloading the first page would drop everything paged in below it.
    */
   const refreshVisit = useCallback(async (item: FeedItem) => {
-    if (item.kind === "post") return;
+    if (item.kind === "post" || item.kind === "reshare") return;
     try {
       const fresh = await fetchFeedVisit(item.id, item.kind);
       if (!fresh) return;
@@ -117,6 +119,43 @@ export default function FeedScreen() {
       );
     }
   }, []);
+
+  /**
+   * Sharing adds a card for your friends, not for you — your own feed keeps the
+   * card you shared from, with the button flipped as the acknowledgement. Taking
+   * back a share of a photo you only reached through someone else drops the card
+   * with it; a refresh brings it back if a friend's own share still carries it.
+   */
+  const share = async (item: FeedItem) => {
+    const postId = item.post_id;
+    if (!postId) return;
+
+    const shared = item.shared_by_me;
+    try {
+      if (shared) {
+        await unsharePost(postId);
+      } else {
+        await sharePost(postId);
+      }
+
+      setItems((previous) =>
+        previous
+          .filter(
+            (row) =>
+              !shared ||
+              !(row.kind === "reshare" && row.post_id === postId && row.sharer_id === userId),
+          )
+          .map((row) =>
+            row.post_id === postId ? { ...row, shared_by_me: !shared } : row,
+          ),
+      );
+    } catch (cause) {
+      Alert.alert(
+        shared ? "Could not remove that" : "Could not share that",
+        cause instanceof Error ? cause.message : "Try again",
+      );
+    }
+  };
 
   const block = (item: FeedItem) => {
     Alert.alert(
@@ -145,13 +184,14 @@ export default function FeedScreen() {
   const options = (item: FeedItem) => {
     if (item.user_id === userId) return;
 
+    const postId = item.post_id;
     Alert.alert(item.display_name, undefined, [
-      ...(item.kind === "post"
+      ...(postId
         ? [
             {
               text: "Report post",
               style: "destructive" as const,
-              onPress: () => setReporting(item.id),
+              onPress: () => setReporting(postId),
             },
           ]
         : []),
@@ -214,7 +254,10 @@ export default function FeedScreen() {
             photoUrl={item.image_path ? urls[item.image_path] : undefined}
             avatarUrl={item.avatar_url ? avatars[item.avatar_url] : undefined}
             onPress={() =>
-              router.push({ pathname: "/post/[id]", params: { id: item.id } })
+              router.push({
+                pathname: "/post/[id]",
+                params: { id: item.post_id ?? item.id },
+              })
             }
             onAuthorPress={() =>
               item.user_id === userId
@@ -226,6 +269,12 @@ export default function FeedScreen() {
             }
             onOptions={() => options(item)}
             onChanged={() => void refreshVisit(item)}
+            onShare={
+              item.post_id && item.user_id !== userId
+                ? () => void share(item)
+                : undefined
+            }
+            sharedByYou={item.sharer_id === userId}
           />
         )}
       />

@@ -99,7 +99,7 @@ function RootNavigator() {
       router.push(`/user/${friendId}`);
       return;
     }
-    if (event === 'commented' || event === 'reacted') {
+    if (event === 'commented' || event === 'reacted' || event === 'reshared') {
       // Under your own photo it opens your gallery, not theirs; under a night
       // out of yours there is nothing but the feed card it was left on.
       router.push(postId ? `/(tabs)/profile?post=${postId}` : '/(tabs)');

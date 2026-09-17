@@ -90,11 +90,15 @@ export type FeedComment = {
  * check-out only the venue; all are a friend's, or your own. A visit yields one
  * of each, keyed by kind, so the two ends of it sit where they happened.
  *
+ * A share is a friend passing someone else's photo on: `user_id` stays the
+ * photographer, because the photo and its thread are still theirs, and
+ * `sharer_id` is who put it on your feed.
+ *
  * The thread and the emoji tally ride along with the row, so a card can be read
  * and replied to without opening anything.
  */
 export type FeedItem = {
-  kind: 'post' | 'check_in' | 'check_out';
+  kind: 'post' | 'reshare' | 'check_in' | 'check_out';
   id: string;
   user_id: string;
   display_name: string;
@@ -107,6 +111,11 @@ export type FeedItem = {
   description: string | null;
   rating: number | null;
   image_path: string | null;
+  /** The photo this row is about; null on a check-in or a check-out. */
+  post_id: string | null;
+  sharer_id: string | null;
+  sharer_name: string | null;
+  shared_by_me: boolean;
   comments: number;
   reactions: number;
   comment_list: FeedComment[];

@@ -7,12 +7,11 @@ import QRCode from 'react-native-qrcode-svg';
 import { Button } from '../../components/Button';
 import { Field } from '../../components/Field';
 import { acceptInvite, createInviteLink, inviteByEmail } from '../../lib/api';
-import { pickContact } from '../../lib/contactInvite';
 import { failureMessage } from '../../lib/failureMessage';
 import { inviteToken } from '../../lib/inviteToken';
 import { colors, spacing } from '../../lib/theme';
 
-type Section = 'contacts' | 'link' | 'email' | 'code';
+type Section = 'link' | 'email' | 'code';
 
 const QR_SIZE = 180;
 
@@ -29,7 +28,6 @@ export default function InviteScreen() {
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [creating, setCreating] = useState(false);
   const [sending, setSending] = useState(false);
-  const [choosing, setChoosing] = useState(false);
   const [redeeming, setRedeeming] = useState(false);
 
   const say = (section: Section, text: string) => setFeedback({ section, text, failed: false });
@@ -52,11 +50,6 @@ export default function InviteScreen() {
     } finally {
       setCreating(false);
     }
-  };
-
-  const shareNewLink = async (message: string) => {
-    const created = await createInviteLink();
-    await Share.share({ message: `${message} ${inviteUrl(created.token)}` });
   };
 
   const copyLink = async () => {
@@ -100,39 +93,6 @@ export default function InviteScreen() {
     }
   };
 
-  /**
-   * Invites whoever the user picks out of their phone. A contact with an email
-   * takes the same path as one typed by hand; one with only a number gets a
-   * link to text, since an invite has to reach an address the app can match.
-   */
-  const chooseContact = async () => {
-    setChoosing(true);
-    setFeedback(null);
-    try {
-      const contact = await pickContact();
-      if (!contact) return;
-
-      const who = contact.name ?? 'Your contact';
-
-      if (contact.email) {
-        await sendTo(contact.email, 'contacts');
-        return;
-      }
-
-      if (contact.phone) {
-        await shareNewLink('Join me on At The Bar:');
-        say('contacts', `${who} has no email saved, so text them the link instead.`);
-        return;
-      }
-
-      fail('contacts', null, `${who} has no email or phone number saved.`);
-    } catch (cause) {
-      fail('contacts', cause, 'Could not open your contacts');
-    } finally {
-      setChoosing(false);
-    }
-  };
-
   const redeem = async () => {
     setRedeeming(true);
     setFeedback(null);
@@ -154,16 +114,6 @@ export default function InviteScreen() {
       automaticallyAdjustKeyboardInsets
       keyboardDismissMode="interactive"
       keyboardShouldPersistTaps="handled">
-      <View style={styles.section}>
-        <Text style={styles.title}>Invite from your phone</Text>
-        <Text style={styles.muted}>
-          Pick someone out of your contacts. Only the person you pick is read — your address book
-          never leaves your phone.
-        </Text>
-        <Button title="Choose from contacts" onPress={chooseContact} loading={choosing} />
-        {renderFeedback('contacts')}
-      </View>
-
       <View style={styles.section}>
         <Text style={styles.title}>Invite by link</Text>
         <Text style={styles.muted}>

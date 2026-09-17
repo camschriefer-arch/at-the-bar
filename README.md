@@ -2,7 +2,7 @@
 
 iOS + Android app that shows which of your friends are out at a bar right now, and nothing else about where they are.
 
-- Sign up with email, add friends by email invite, by picking one person out of your phone's contacts, or with a shareable invite link others can open, copy or scan as a QR code; accept requests.
+- Sign up with email, add friends by email invite or with a shareable invite link others can open, copy or scan as a QR code; accept requests.
 - The phone checks whether you are within **0.1 miles** of a bar, pub or restaurant. Stay **still** there for **5 minutes** and it asks "Are you at Jake & Joe's?" — a yes sets your status to _At the bar_, and nothing else does. With several venues in range you get one notification instead of one each, and pick which one you are at in the app. Passing a venue, or working above one, never checks you in. "Check in now" asks straight away.
 - Answering "Not here" keeps that venue quiet for two weeks, so the restaurant under your gym stops asking. Checking in there by hand undoes it.
 - A venue that has just asked waits six hours before asking again, but checking in anywhere clears that wait, so moving to the bar next door still asks.

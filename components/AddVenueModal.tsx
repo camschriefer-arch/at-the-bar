@@ -4,7 +4,7 @@ import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import { Button } from './Button';
 import { Field } from './Field';
 import { addVenue } from '../lib/barCache';
-import { getCurrentPoint } from '../lib/locationService';
+import { addressAt, getCurrentPoint } from '../lib/locationService';
 import { colors, spacing } from '../lib/theme';
 import type { Bar, VenueCategory } from '../lib/types';
 
@@ -48,7 +48,7 @@ export function AddVenueModal({ visible, onClose, onAdded }: AddVenueModalProps)
     setError(null);
     try {
       const point = await getCurrentPoint();
-      onAdded(await addVenue(name.trim(), point, category));
+      onAdded(await addVenue(name.trim(), point, category, await addressAt(point)));
       close();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not add that venue');

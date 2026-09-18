@@ -1,5 +1,6 @@
 import * as Location from 'expo-location';
 
+import { toVenueAddress, type VenueAddress } from './address';
 import { BACKGROUND_LOCATION_TASK } from './backgroundLocationTask';
 import { isSharingEnabled } from './sharing';
 
@@ -85,4 +86,22 @@ export async function getCurrentPoint(): Promise<{ lat: number; lng: number }> {
   });
 
   return { lat: position.coords.latitude, lng: position.coords.longitude };
+}
+
+/**
+ * The street, city and state a point sits in, asked of the platform geocoder.
+ * Returns empty parts rather than throwing: an address is a label on a venue,
+ * never a reason to fail adding one.
+ */
+export async function addressAt(point: { lat: number; lng: number }): Promise<VenueAddress> {
+  try {
+    const [place] = await Location.reverseGeocodeAsync({
+      latitude: point.lat,
+      longitude: point.lng,
+    });
+
+    return toVenueAddress(place);
+  } catch {
+    return { street: null, city: null, state: null };
+  }
 }

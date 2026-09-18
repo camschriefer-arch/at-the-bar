@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import type { VenueAddress } from './address';
 import { supabase } from './supabase';
 import { tileBoundingBox, tileKey, type LatLng } from './geo';
 import type { Bar, VenueCategory } from './types';
@@ -86,13 +87,17 @@ export async function searchBarsByName(query: string, limit = 10): Promise<Bar[]
 export async function addVenue(
   name: string,
   point: LatLng,
-  category: VenueCategory
+  category: VenueCategory,
+  address: VenueAddress
 ): Promise<Bar> {
   const { data, error } = await supabase.rpc('add_venue', {
     p_name: name,
     p_lat: point.lat,
     p_lng: point.lng,
     p_category: category,
+    p_street: address.street,
+    p_city: address.city,
+    p_state: address.state,
   });
 
   if (error) throw error;

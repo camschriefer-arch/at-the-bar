@@ -183,6 +183,18 @@ for f in supabase/migrations/*.sql; do docker exec -i atb-pg psql -U postgres -v
 docker exec -i atb-pg psql -U postgres -v ON_ERROR_STOP=1 < supabase/test/smoke.sql
 ```
 
+## Seeing what is happening in a live app
+
+The app sends nothing to an analytics service, so the numbers live in the database.
+`supabase/metrics.sql` holds a read-only query per question — signups, daily actives,
+retention by signup week, check-ins and visit length, posts and whether anyone
+responds to them, the invite and friend-request funnels, how many people have no
+friends or no push token, outbox backlog, and the reports nothing else surfaces.
+Paste a block into the Supabase SQL editor and run it.
+
+App Store Connect → Analytics covers the other half — installs, sessions and crashes
+— but only in aggregate, and only for users who opted into sharing.
+
 ## Not done yet
 
 - Blocking, and per-friend visibility controls.

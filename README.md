@@ -62,6 +62,15 @@ Your coordinates never leave your device. The app downloads the venues for a coa
 
    Venues come from the newest [Overture Maps](https://overturemaps.org) release, queried straight off S3 as GeoParquet — about 350k US bars, pubs and restaurants. The import is idempotent (keyed on `source, source_id`), so re-running it only refreshes rows. A full run also calls `prune_unused_osm_bars()` to drop the OpenStreetMap rows Overture replaced, keeping any that a check-in or a drink photo still points at; pass `--keep-osm` to skip that.
 
+   A venue someone adds from the app carries its own address, geocoded on the phone as it is saved. Venues added before that shipped have coordinates but no address; fill them in once with:
+
+   ```sh
+   SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... python3 scripts/backfill_venue_addresses.py --dry-run
+   SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... python3 scripts/backfill_venue_addresses.py
+   ```
+
+   It asks [Nominatim](https://nominatim.org) what is at each venue's coordinates, one venue a second, and only writes fields that are still empty, so it is safe to re-run and it never overwrites an address that is already there.
+
    Production keeps itself current: [`.github/workflows/refresh-venues.yml`](.github/workflows/refresh-venues.yml) re-imports the country at 04:00 UTC on the 1st of each month. It needs the repository secrets `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, and can be run by hand (optionally for a few states) from the Actions tab.
 
 4. Run it. Background location needs a development build, not Expo Go:

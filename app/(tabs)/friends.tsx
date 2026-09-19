@@ -4,14 +4,18 @@ import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } 
 
 import { Button } from '../../components/Button';
 import { FriendGroupModal } from '../../components/FriendGroupModal';
-import { fetchFriendFeed, fetchIncomingRequests, respondToRequest } from '../../lib/api';
+import {
+  fetchFriendFeed,
+  fetchIncomingRequests,
+  fetchMutedIds,
+  respondToRequest,
+  setMuted,
+} from '../../lib/api';
 import { useAuth } from '../../lib/AuthProvider';
 import {
   fetchFriendGroups,
   fetchShushes,
-  shushFriend,
   shushGroup,
-  unshushFriend,
   unshushGroup,
 } from '../../lib/friendGroups';
 import { untilLabel } from '../../lib/shushTime';
@@ -42,6 +46,7 @@ export default function FriendsScreen() {
   const [requests, setRequests] = useState<{ id: string; requester: Profile }[]>([]);
   const [groups, setGroups] = useState<FriendGroup[]>([]);
   const [shushed, setShushed] = useState<Record<string, string>>({});
+  const [muted, setMutedIds] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState<FriendGroup | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -50,16 +55,18 @@ export default function FriendsScreen() {
   const load = useCallback(async () => {
     if (!userId) return;
     try {
-      const [feed, incoming, myGroups, shushes] = await Promise.all([
+      const [feed, incoming, myGroups, shushes, mutedIds] = await Promise.all([
         fetchFriendFeed(),
         fetchIncomingRequests(userId),
         fetchFriendGroups(),
         fetchShushes(),
+        fetchMutedIds(),
       ]);
       setFriends(feed);
       setRequests(incoming.map(({ request, requester }) => ({ id: request.id, requester })));
       setGroups(myGroups);
       setShushed(Object.fromEntries(shushes.map((row) => [row.user_id, row.expires_at])));
+      setMutedIds(new Set(mutedIds));
       setError(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not load friends');
@@ -112,16 +119,14 @@ export default function FriendsScreen() {
     ]);
   };
 
-  const toggleFriend = (friend: FriendFeedRow) => {
-    if (shushed[friend.friend_id]) {
-      void run(() => unshushFriend(friend.friend_id));
-      return;
-    }
-    confirmShush(
-      `Shhhh ${friend.display_name}?`,
-      `${friend.display_name} will not see where you are, what you post, or get notifications about you.`,
-      () => shushFriend(friend.friend_id)
-    );
+  /** Mutes or unmutes everyone in a group in one go. */
+  const toggleGroupMute = (members: FriendFeedRow[], allMuted: boolean) => {
+    if (!userId) return;
+    void run(async () => {
+      for (const member of members) {
+        await setMuted(userId, member.friend_id, !allMuted);
+      }
+    });
   };
 
   const toggleGroup = (group: FriendGroup, allQuiet: boolean) => {
@@ -148,30 +153,24 @@ export default function FriendsScreen() {
   const friendCard = (friend: FriendFeedRow) => {
     const quietUntil = shushed[friend.friend_id];
     return (
-      <View key={friend.friend_id} style={friend.bar_id ? styles.card : styles.cardMuted}>
-        <Pressable
-          onPress={() => router.push({ pathname: '/friend/[id]', params: { id: friend.friend_id } })}>
-          <Text style={styles.name}>{friend.display_name}</Text>
-          {friend.bar_id ? (
-            <>
-              <Text style={styles.barName}>{friend.bar_name}</Text>
-              <Text style={styles.muted}>
-                {[friend.bar_city, friend.bar_state].filter(Boolean).join(', ')}
-                {friend.arrived_at ? ` · ${sinceLabel(friend.arrived_at)}` : ''}
-              </Text>
-            </>
-          ) : null}
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityState={{ selected: Boolean(quietUntil) }}
-          style={styles.shush}
-          onPress={() => toggleFriend(friend)}>
-          <Text style={quietUntil ? styles.shushOn : styles.shushOff}>
-            {quietUntil ? `Shhhh until ${untilLabel(quietUntil)} · tap to undo` : 'Shhhh'}
-          </Text>
-        </Pressable>
-      </View>
+      <Pressable
+        key={friend.friend_id}
+        style={friend.bar_id ? styles.card : styles.cardMuted}
+        onPress={() => router.push({ pathname: '/friend/[id]', params: { id: friend.friend_id } })}>
+        <Text style={styles.name}>{friend.display_name}</Text>
+        {friend.bar_id ? (
+          <>
+            <Text style={styles.barName}>{friend.bar_name}</Text>
+            <Text style={styles.muted}>
+              {[friend.bar_city, friend.bar_state].filter(Boolean).join(', ')}
+              {friend.arrived_at ? ` · ${sinceLabel(friend.arrived_at)}` : ''}
+            </Text>
+          </>
+        ) : null}
+        {quietUntil ? (
+          <Text style={styles.shushOn}>Shhhh until {untilLabel(quietUntil)}</Text>
+        ) : null}
+      </Pressable>
     );
   };
 
@@ -215,21 +214,33 @@ export default function FriendsScreen() {
             .filter((friend): friend is FriendFeedRow => friend !== undefined)
             .sort(byPresence);
           const allQuiet = members.length > 0 && members.every((m) => shushed[m.friend_id]);
+          const allMuted = members.length > 0 && members.every((m) => muted.has(m.friend_id));
           return (
             <View key={group.group_id} style={styles.section}>
               <View style={styles.groupHeader}>
                 <Text style={styles.sectionTitle}>{group.name}</Text>
-                <View style={styles.groupActions}>
-                  <Pressable accessibilityRole="button" onPress={() => toggleGroup(group, allQuiet)}>
-                    <Text style={allQuiet ? styles.shushOn : styles.link}>
-                      {allQuiet ? 'Unshhhh all' : 'Shhhh all'}
-                    </Text>
-                  </Pressable>
-                  <Pressable accessibilityRole="button" onPress={() => openEditor(group)}>
-                    <Text style={styles.link}>Edit</Text>
-                  </Pressable>
-                </View>
+                <Pressable accessibilityRole="button" onPress={() => openEditor(group)}>
+                  <Text style={styles.link}>Edit</Text>
+                </Pressable>
               </View>
+              {members.length > 0 ? (
+                <View style={styles.actions}>
+                  <View style={styles.action}>
+                    <Button
+                      title={allQuiet ? 'Unshhhh all' : 'Shhhh all'}
+                      variant={allQuiet ? 'primary' : 'secondary'}
+                      onPress={() => toggleGroup(group, allQuiet)}
+                    />
+                  </View>
+                  <View style={styles.action}>
+                    <Button
+                      title={allMuted ? 'Unmute all' : 'Mute all'}
+                      variant={allMuted ? 'primary' : 'secondary'}
+                      onPress={() => toggleGroupMute(members, allMuted)}
+                    />
+                  </View>
+                </View>
+              ) : null}
               {members.length === 0 ? (
                 <Text style={styles.muted}>Nobody in this group yet — tap Edit to add people.</Text>
               ) : (
@@ -327,21 +338,13 @@ const styles = StyleSheet.create({
   muted: {
     color: colors.muted,
   },
-  shush: {
-    paddingTop: spacing.xs,
-  },
   shushOn: {
     color: colors.accent,
-    fontSize: 13,
-  },
-  shushOff: {
-    color: colors.muted,
     fontSize: 13,
   },
   actions: {
     flexDirection: 'row',
     gap: spacing.sm,
-    marginTop: spacing.sm,
   },
   action: {
     flex: 1,

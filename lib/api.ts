@@ -143,12 +143,23 @@ export async function isMuted(friendId: string): Promise<boolean> {
   return data !== null;
 }
 
+/** The friends whose arrive/leave notifications this user has silenced. */
+export async function fetchMutedIds(): Promise<string[]> {
+  const { data, error } = await supabase.from('notification_mutes').select('muted_id');
+  if (error) throw error;
+  return (data ?? []).map((row) => row.muted_id as string);
+}
+
 export async function setMuted(userId: string, friendId: string, muted: boolean): Promise<void> {
   const { error } = muted
     ? await supabase
         .from('notification_mutes')
         .upsert({ muter_id: userId, muted_id: friendId })
-    : await supabase.from('notification_mutes').delete().eq('muted_id', friendId);
+    : await supabase
+        .from('notification_mutes')
+        .delete()
+        .eq('muter_id', userId)
+        .eq('muted_id', friendId);
 
   if (error) throw error;
 }

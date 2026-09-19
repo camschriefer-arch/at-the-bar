@@ -165,3 +165,14 @@ export type InviteResult =
   | { kind: 'friendship'; status: FriendRequest['status']; friendship_id: string };
 
 export type InviteLink = { token: string; expires_at: string };
+
+/** A private label on some of your friends. Only its owner ever sees one. */
+export type FriendGroup = {
+  group_id: string;
+  name: string;
+  member_ids: string[];
+  created_at: string;
+};
+
+/** A friend you are hidden from, and when that lifts. */
+export type Shush = { user_id: string; expires_at: string };

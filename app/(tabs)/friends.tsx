@@ -160,30 +160,25 @@ export default function FriendsScreen() {
     );
   };
 
-  const quietActions = (
-    label: string,
-    members: FriendFeedRow[],
-    group: FriendGroup | null,
-    small: boolean
-  ) => {
+  const quietActions = (label: string, members: FriendFeedRow[], group: FriendGroup | null) => {
     if (members.length === 0) return null;
     const allQuiet = members.every((m) => shushed[m.friend_id]);
     const allMuted = members.every((m) => muted.has(m.friend_id));
     return (
-      <View style={small ? styles.inlineActions : styles.actions}>
-        <View style={small ? styles.inlineAction : styles.action}>
+      <View style={styles.inlineActions}>
+        <View style={styles.inlineAction}>
           <Button
             title={allQuiet ? 'Unshhhh all' : 'Shhhh all'}
             variant={allQuiet ? 'quietOn' : 'quiet'}
-            size={small ? 'small' : 'regular'}
+            size="small"
             onPress={() => toggleShushAll(label, members, allQuiet, group)}
           />
         </View>
-        <View style={small ? styles.inlineAction : styles.action}>
+        <View style={styles.inlineAction}>
           <Button
             title={allMuted ? 'Unmute all' : 'Mute all'}
             variant={allMuted ? 'quietOn' : 'quiet'}
-            size={small ? 'small' : 'regular'}
+            size="small"
             onPress={() => toggleGroupMute(members, allMuted)}
           />
         </View>
@@ -267,16 +262,18 @@ export default function FriendsScreen() {
             <View key={group.group_id} style={styles.section}>
               <View style={styles.groupHeader}>
                 <Text style={styles.sectionTitle}>{group.name}</Text>
-                <Pressable accessibilityRole="button" onPress={() => openEditor(group)}>
-                  <Text style={styles.link}>Edit</Text>
-                </Pressable>
+                <View style={styles.headerActions}>
+                  {quietActions(group.name, members, group)}
+                  <Pressable accessibilityRole="button" onPress={() => openEditor(group)}>
+                    <Text style={styles.link}>Edit</Text>
+                  </Pressable>
+                </View>
               </View>
               {members.length === 0 ? (
                 <Text style={styles.muted}>Nobody in this group yet — tap Edit to add people.</Text>
               ) : (
                 members.map(friendCard)
               )}
-              {quietActions(group.name, members, group, false)}
             </View>
           );
         })}
@@ -286,12 +283,7 @@ export default function FriendsScreen() {
             <Text style={styles.sectionTitle}>
               {groups.length > 0 ? 'Everyone else' : 'Friends'}
             </Text>
-            {quietActions(
-              groups.length > 0 ? 'Everyone else' : 'your friends',
-              ungrouped,
-              null,
-              true
-            )}
+            {quietActions(groups.length > 0 ? 'Everyone else' : 'your friends', ungrouped, null)}
           </View>
           {ungrouped.length === 0 ? (
             <Text style={styles.muted}>
@@ -342,6 +334,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
+  },
+  headerActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexShrink: 1,
+    gap: spacing.sm,
   },
   inlineActions: {
     flexDirection: 'row',

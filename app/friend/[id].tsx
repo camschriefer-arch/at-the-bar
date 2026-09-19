@@ -9,6 +9,8 @@ import { DrinkGallery } from '../../components/DrinkGallery';
 import { TopBars } from '../../components/TopBars';
 import { fetchFriendFeed, fetchTopBars, isMuted, removeFriend, setMuted } from '../../lib/api';
 import { useAuth } from '../../lib/AuthProvider';
+import { fetchShushes, shushFriend, unshushFriend } from '../../lib/friendGroups';
+import { untilLabel } from '../../lib/shushTime';
 import { fetchDrinkPosts, signedAvatarUrl, signedDrinkUrls } from '../../lib/photos';
 import { colors, spacing } from '../../lib/theme';
 import type { DrinkPost, FriendFeedRow, TopBar } from '../../lib/types';
@@ -28,6 +30,8 @@ export default function FriendScreen() {
   const [loading, setLoading] = useState(true);
   const [muted, setMutedState] = useState(false);
   const [muting, setMuting] = useState(false);
+  const [shushedUntil, setShushedUntil] = useState<string | null>(null);
+  const [shushing, setShushing] = useState(false);
   const [removing, setRemoving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,16 +45,18 @@ export default function FriendScreen() {
       if (!row) return;
 
       // Only reachable for an accepted friend; the database enforces the same rule.
-      const [drinks, frequented, silenced] = await Promise.all([
+      const [drinks, frequented, silenced, shushes] = await Promise.all([
         fetchDrinkPosts(row.friend_id),
         fetchTopBars(row.friend_id),
         // Whether they are muted is the least of what this screen is for, so it
         // never costs the whole profile.
         isMuted(row.friend_id).catch(() => false),
+        fetchShushes().catch(() => []),
       ]);
       setPosts(drinks);
       setTopBars(frequented);
       setMutedState(silenced);
+      setShushedUntil(shushes.find((s) => s.user_id === row.friend_id)?.expires_at ?? null);
       const [avatar, urls] = await Promise.all([
         signedAvatarUrl(row.avatar_url),
         signedDrinkUrls(drinks),
@@ -93,6 +99,37 @@ export default function FriendScreen() {
     } finally {
       setMuting(false);
     }
+  };
+
+  const setShush = async (quiet: boolean, name: string) => {
+    setShushing(true);
+    try {
+      if (quiet) {
+        const until = await shushFriend(id);
+        setShushedUntil(until);
+        Alert.alert('Shhhh', `${name} will not see you until ${untilLabel(until)}.`);
+      } else {
+        await unshushFriend(id);
+        setShushedUntil(null);
+      }
+      setError(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not change that');
+    } finally {
+      setShushing(false);
+    }
+  };
+
+  /** Says up front that going quiet is temporary, since nothing else will. */
+  const confirmShush = (name: string) => {
+    Alert.alert(
+      `Shhhh ${name}?`,
+      `${name} will not see where you are, what you post, or get notifications about you. It comes off by itself after 24 hours.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Shhhh', onPress: () => void setShush(true, name) },
+      ]
+    );
   };
 
   const confirmRemove = (name: string) => {
@@ -191,6 +228,21 @@ export default function FriendScreen() {
       </View>
 
       <View style={styles.footer}>
+        <Text style={styles.muted}>
+          {shushedUntil
+            ? `${friend.display_name} cannot see you until ${untilLabel(shushedUntil)}.`
+            : `Shhhh hides you from ${friend.display_name} for 24 hours — your bar, your posts and their notifications about you.`}
+        </Text>
+        <Button
+          title={shushedUntil ? 'Unshhhh' : 'Shhhh'}
+          variant="secondary"
+          loading={shushing}
+          onPress={() =>
+            shushedUntil
+              ? void setShush(false, friend.display_name)
+              : confirmShush(friend.display_name)
+          }
+        />
         <Text style={styles.muted}>
           {muted
             ? `Notifications from ${friend.display_name} are off. You can still see them here.`

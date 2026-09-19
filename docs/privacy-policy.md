@@ -47,6 +47,14 @@ venue in the public catalog, plus the time you arrived there. Closing the app,
 tapping "Go offline", or revoking location permission stops the process entirely,
 and nothing is ever recorded for a venue you did not confirm.
 
+Adding a missing venue is the one exception, and it is deliberate: when you tap
+"Add this place", the point your phone is standing on becomes that venue's place
+on the map, so anyone can check in there afterwards. It is stored as a venue in
+the public catalog, under the venue's name and not yours, and the app asks your
+phone's own maps software for the street, city and state at that point so the
+venue reads like the rest of the catalog. That lookup goes to Apple or Google,
+whoever made your phone, not to us.
+
 ## Contacts
 
 The app has no access to your contacts at all. Invites are addressed by hand:
@@ -72,7 +80,8 @@ they are not publicly addressable on the internet.
 
 ## What we never do
 
-- We never store your coordinates.
+- We never store your coordinates, or attach them to your account. The only
+  coordinates we hold are the venues themselves, including one you added.
 - We never upload your address book, in whole or as hashes.
 - We never record a place you did not explicitly confirm, and we keep no trace of
   anywhere that is not a venue in the public catalog.

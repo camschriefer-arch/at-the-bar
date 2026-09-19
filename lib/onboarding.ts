@@ -14,3 +14,19 @@ export async function hasSeenLocationIntro(): Promise<boolean> {
 export async function markLocationIntroSeen(): Promise<void> {
   await AsyncStorage.setItem(LOCATION_INTRO_KEY, 'seen');
 }
+
+// Deliberately in memory only: "Not now" holds for the rest of the time the
+// app is open and the reminder returns on the next launch.
+let reminderSnoozed = false;
+
+export function snoozeLocationReminder(): void {
+  reminderSnoozed = true;
+}
+
+export function clearLocationReminderSnooze(): void {
+  reminderSnoozed = false;
+}
+
+export function isLocationReminderSnoozed(): boolean {
+  return reminderSnoozed;
+}

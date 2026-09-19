@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -10,14 +10,19 @@ import {
   startBackgroundUpdates,
   type PermissionLevel,
 } from '../lib/locationService';
-import { markLocationIntroSeen } from '../lib/onboarding';
+import {
+  hasSeenLocationIntro,
+  markLocationIntroSeen,
+  snoozeLocationReminder,
+} from '../lib/onboarding';
 import { isSharingEnabled } from '../lib/sharing';
 import { colors, spacing } from '../lib/theme';
 
 /**
- * Shown once, before the system dialogs. iOS grants one Always upgrade prompt
- * per install and never offers Always in the first dialog, so the reason for
- * it has to land before the user is asked.
+ * Shown before the system dialogs, and again on every launch until Always is
+ * granted. iOS grants one Always upgrade prompt per install and never offers
+ * Always in the first dialog, so the reason for it has to land before the user
+ * is asked, and afterwards Settings is the only way back.
  */
 export default function LocationAccess() {
   const router = useRouter();
@@ -25,10 +30,29 @@ export default function LocationAccess() {
   const [level, setLevel] = useState<PermissionLevel | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [returning, setReturning] = useState(false);
+
+  useEffect(() => {
+    let stale = false;
+    void hasSeenLocationIntro()
+      .then((seen) => {
+        if (!stale) setReturning(seen);
+      })
+      .catch(() => undefined);
+
+    return () => {
+      stale = true;
+    };
+  }, []);
 
   const done = async () => {
     await markLocationIntroSeen();
     router.replace('/(tabs)');
+  };
+
+  const later = () => {
+    snoozeLocationReminder();
+    void done();
   };
 
   const startBackgroundIfSharing = async () => {
@@ -83,7 +107,9 @@ export default function LocationAccess() {
         styles.content,
         { paddingTop: insets.top + spacing.lg, paddingBottom: insets.bottom + spacing.lg },
       ]}>
-      <Text style={styles.title}>Let friends know you are out</Text>
+      <Text style={styles.title}>
+        {returning ? 'Location is not set to Always' : 'Let friends know you are out'}
+      </Text>
 
       <View style={styles.card}>
         <Text style={styles.body}>
@@ -92,9 +118,9 @@ export default function LocationAccess() {
           access set to &quot;Always&quot; to notice at all.
         </Text>
         <Text style={styles.body}>
-          iOS asks in two steps: first whether the app can use your location, then whether it can
-          keep doing so in the background. Choose &quot;Allow While Using App&quot;, then
-          &quot;Change to Always Allow&quot;.
+          {returning
+            ? 'Until it is, nothing arrives on its own: open Settings and set Location to "Always", or check in by hand from the You tab.'
+            : 'iOS asks in two steps: first whether the app can use your location, then whether it can keep doing so in the background. Choose "Allow While Using App", then "Change to Always Allow".'}
         </Text>
         <Text style={styles.fineprint}>
           Your coordinates never leave your phone. Only a bar you confirm is stored, only friends
@@ -123,7 +149,9 @@ export default function LocationAccess() {
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
       <View style={styles.actions}>
-        {level === 'foreground' ? (
+        {/* A returning user has already spent the one-shot upgrade dialog, so
+            askAlways falls through to Settings, which is the only route left. */}
+        {level === 'foreground' || (returning && level === null) ? (
           <Button title="Allow Always" onPress={askAlways} loading={busy} />
         ) : (
           <Button
@@ -132,7 +160,7 @@ export default function LocationAccess() {
             loading={busy}
           />
         )}
-        <Button title="Not now" variant="secondary" onPress={() => void done()} disabled={busy} />
+        <Button title="Not now" variant="secondary" onPress={later} disabled={busy} />
       </View>
     </ScrollView>
   );

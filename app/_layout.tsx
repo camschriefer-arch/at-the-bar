@@ -8,7 +8,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from '../lib/AuthProvider';
 import { getPermissionLevel, resumeBackgroundUpdates } from '../lib/locationService';
 import { registerForPushNotifications } from '../lib/notifications';
-import { hasSeenLocationIntro } from '../lib/onboarding';
+import { clearLocationReminderSnooze, isLocationReminderSnoozed } from '../lib/onboarding';
 import { checkInAt } from '../lib/statusSync';
 import { colors } from '../lib/theme';
 import {
@@ -65,25 +65,40 @@ function RootNavigator() {
   }, [session]);
 
   // iOS never offers Always in its first dialog and only allows one upgrade
-  // prompt per install, so the explainer runs before either of them.
+  // prompt per install, so the explainer runs before either of them — and
+  // again on every launch until Always is granted, since nothing the app can
+  // detect works without it.
+  const onLocationAccess = segments[0] === 'location-access';
   useEffect(() => {
-    if (!session) return;
+    if (!session || onLocationAccess) return;
 
     let stale = false;
-    void (async () => {
-      try {
-        const [seen, level] = await Promise.all([hasSeenLocationIntro(), getPermissionLevel()]);
-        if (stale || seen || level === 'background') return;
-        router.replace('/location-access');
-      } catch {
-        // The explainer is a nicety; failing to read it must not block the app.
-      }
-    })();
+    const check = () => {
+      void (async () => {
+        try {
+          if (stale || isLocationReminderSnoozed()) return;
+          if ((await getPermissionLevel()) === 'background') return;
+          router.replace('/location-access');
+        } catch {
+          // The explainer is a nicety; failing to read it must not block the app.
+        }
+      })();
+    };
+
+    check();
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state !== 'active') return;
+      // Reopening the app is the moment to ask again; "Not now" only held for
+      // the session it was tapped in.
+      clearLocationReminderSnooze();
+      check();
+    });
 
     return () => {
       stale = true;
+      subscription.remove();
     };
-  }, [session, router]);
+  }, [session, router, onLocationAccess]);
 
   // "Bob is at the bar" says nothing about where; tapping it opens Bob, which
   // only renders his bar if the friendship still allows it.

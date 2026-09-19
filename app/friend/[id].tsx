@@ -107,7 +107,7 @@ export default function FriendScreen() {
       if (quiet) {
         const until = await shushFriend(id);
         setShushedUntil(until);
-        Alert.alert('Shhhh', `${name} will not see you until ${untilLabel(until)}.`);
+        Alert.alert('Hidden', `${name} will not see you until ${untilLabel(until)}.`);
       } else {
         await unshushFriend(id);
         setShushedUntil(null);
@@ -123,11 +123,11 @@ export default function FriendScreen() {
   /** Says up front that going quiet is temporary, since nothing else will. */
   const confirmShush = (name: string) => {
     Alert.alert(
-      `Shhhh ${name}?`,
+      `Hide from ${name}?`,
       `${name} will not see where you are, what you post, or get notifications about you. It comes off by itself after 24 hours.`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Shhhh', onPress: () => void setShush(true, name) },
+        { text: 'Hide', onPress: () => void setShush(true, name) },
       ]
     );
   };
@@ -231,10 +231,10 @@ export default function FriendScreen() {
         <Text style={styles.muted}>
           {shushedUntil
             ? `${friend.display_name} cannot see you until ${untilLabel(shushedUntil)}.`
-            : `Shhhh hides you from ${friend.display_name} for 24 hours — your bar, your posts and their notifications about you.`}
+            : `Hide From hides you from ${friend.display_name} for 24 hours — your bar, your posts and their notifications about you.`}
         </Text>
         <Button
-          title={shushedUntil ? 'Unshhhh' : 'Shhhh'}
+          title={shushedUntil ? 'Unhide' : 'Hide From'}
           variant="secondary"
           loading={shushing}
           onPress={() =>

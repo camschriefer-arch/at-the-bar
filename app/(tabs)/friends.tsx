@@ -106,16 +106,16 @@ export default function FriendsScreen() {
     }
   };
 
-  /** Warns that a shhhh is temporary before it starts, and says when it lifts. */
+  /** Warns that hiding is temporary before it starts, and says when it lifts. */
   const confirmShush = (title: string, blurb: string, start: () => Promise<string>) => {
     Alert.alert(title, `${blurb} It comes off by itself after 24 hours.`, [
       { text: 'Cancel', style: 'cancel' },
       {
-        text: 'Shhhh',
+        text: 'Hide',
         onPress: () =>
           void run(async () => {
             const until = await start();
-            Alert.alert('Shhhh', `You are hidden until ${untilLabel(until)}.`);
+            Alert.alert('Hidden', `You are hidden until ${untilLabel(until)}.`);
           }),
       },
     ]);
@@ -131,7 +131,7 @@ export default function FriendsScreen() {
     });
   };
 
-  /** Shhhh a whole list: one call for a real group, person by person for Everyone else. */
+  /** Hide from a whole list: one call for a real group, person by person for Everyone else. */
   const toggleShushAll = (
     label: string,
     members: FriendFeedRow[],
@@ -149,7 +149,7 @@ export default function FriendsScreen() {
       return;
     }
     confirmShush(
-      `Shhhh ${label}?`,
+      `Hide from ${label}?`,
       `Nobody in ${label} will see where you are, what you post, or get notifications about you.`,
       async () => {
         if (group) return shushGroup(group.group_id);
@@ -168,7 +168,7 @@ export default function FriendsScreen() {
       <View style={styles.inlineActions}>
         <View style={styles.inlineAction}>
           <Button
-            title={allQuiet ? 'Unshhhh all' : 'Shhhh all'}
+            title={allQuiet ? 'Unhide all' : 'Hide from all'}
             variant={allQuiet ? 'quietOn' : 'quiet'}
             size="small"
             onPress={() => toggleShushAll(label, members, allQuiet, group)}
@@ -213,7 +213,7 @@ export default function FriendsScreen() {
           </>
         ) : null}
         {quietUntil ? (
-          <Text style={styles.shushOn}>Shhhh until {untilLabel(quietUntil)}</Text>
+          <Text style={styles.shushOn}>Hidden until {untilLabel(quietUntil)}</Text>
         ) : null}
       </Pressable>
     );

@@ -103,7 +103,7 @@ The only user-generated content is drink photos, their notes, and comments and e
 HOW TO TEST
 Sign in with the demo account below. The Feed tab shows a seeded friend's arrivals, departures and photos, with report and block behind a long press. The Friends tab shows that friend checked in at a venue; tapping them shows the venue and a map pin, which is the only location data any user can see about another. The You tab has "Check in now", which performs the location read immediately rather than waiting for the five-minute dwell, and shows the confirmation prompt. The Invite tab creates a shareable invite link.
 
-Demo account: <email> / <password>
+Demo account: cam.schriefer+review@gmail.com / <password, entered in App Store Connect only>
 ```
 
 ## Screenshots

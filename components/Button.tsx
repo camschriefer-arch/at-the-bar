@@ -7,7 +7,8 @@ type ButtonProps = {
   onPress: () => void;
   loading?: boolean;
   disabled?: boolean;
-  variant?: 'primary' | 'secondary';
+  variant?: 'primary' | 'secondary' | 'quiet' | 'quietOn';
+  size?: 'regular' | 'small';
 };
 
 export function Button({
@@ -16,8 +17,10 @@ export function Button({
   loading = false,
   disabled = false,
   variant = 'primary',
+  size = 'regular',
 }: ButtonProps) {
   const isDisabled = disabled || loading;
+  const onDark = variant === 'primary' || variant === 'quietOn';
 
   return (
     <Pressable
@@ -26,15 +29,14 @@ export function Button({
       disabled={isDisabled}
       style={({ pressed }) => [
         styles.base,
-        variant === 'primary' ? styles.primary : styles.secondary,
+        size === 'small' && styles.small,
+        fills[variant],
         (pressed || isDisabled) && styles.dimmed,
       ]}>
       {loading ? (
-        <ActivityIndicator color={variant === 'primary' ? colors.background : colors.text} />
+        <ActivityIndicator color={onDark ? colors.background : colors.text} />
       ) : (
-        <Text style={variant === 'primary' ? styles.primaryLabel : styles.secondaryLabel}>
-          {title}
-        </Text>
+        <Text style={[labels[variant], size === 'small' && styles.smallLabel]}>{title}</Text>
       )}
     </Pressable>
   );
@@ -50,10 +52,22 @@ const styles = StyleSheet.create({
   primary: {
     backgroundColor: colors.accent,
   },
+  small: {
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: spacing.xs + 2,
+  },
   secondary: {
     backgroundColor: 'transparent',
     borderColor: colors.border,
     borderWidth: 1,
+  },
+  quiet: {
+    backgroundColor: 'transparent',
+    borderColor: colors.quiet,
+    borderWidth: 1,
+  },
+  quietOn: {
+    backgroundColor: colors.quiet,
   },
   dimmed: {
     opacity: 0.6,
@@ -68,4 +82,26 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  quietLabel: {
+    color: colors.quiet,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  smallLabel: {
+    fontSize: 13,
+  },
 });
+
+const fills = {
+  primary: styles.primary,
+  secondary: styles.secondary,
+  quiet: styles.quiet,
+  quietOn: styles.quietOn,
+};
+
+const labels = {
+  primary: styles.primaryLabel,
+  secondary: styles.secondaryLabel,
+  quiet: styles.quietLabel,
+  quietOn: styles.primaryLabel,
+};

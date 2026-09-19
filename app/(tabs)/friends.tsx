@@ -15,7 +15,9 @@ import { useAuth } from '../../lib/AuthProvider';
 import {
   fetchFriendGroups,
   fetchShushes,
+  shushFriend,
   shushGroup,
+  unshushFriend,
   unshushGroup,
 } from '../../lib/friendGroups';
 import { untilLabel } from '../../lib/shushTime';
@@ -129,15 +131,63 @@ export default function FriendsScreen() {
     });
   };
 
-  const toggleGroup = (group: FriendGroup, allQuiet: boolean) => {
+  /** Shhhh a whole list: one call for a real group, person by person for Everyone else. */
+  const toggleShushAll = (
+    label: string,
+    members: FriendFeedRow[],
+    allQuiet: boolean,
+    group: FriendGroup | null
+  ) => {
     if (allQuiet) {
-      void run(() => unshushGroup(group.group_id));
+      void run(async () => {
+        if (group) {
+          await unshushGroup(group.group_id);
+          return;
+        }
+        for (const member of members) await unshushFriend(member.friend_id);
+      });
       return;
     }
     confirmShush(
-      `Shhhh ${group.name}?`,
-      `Nobody in ${group.name} will see where you are, what you post, or get notifications about you.`,
-      () => shushGroup(group.group_id)
+      `Shhhh ${label}?`,
+      `Nobody in ${label} will see where you are, what you post, or get notifications about you.`,
+      async () => {
+        if (group) return shushGroup(group.group_id);
+        let until = '';
+        for (const member of members) until = await shushFriend(member.friend_id);
+        return until;
+      }
+    );
+  };
+
+  const quietActions = (
+    label: string,
+    members: FriendFeedRow[],
+    group: FriendGroup | null,
+    small: boolean
+  ) => {
+    if (members.length === 0) return null;
+    const allQuiet = members.every((m) => shushed[m.friend_id]);
+    const allMuted = members.every((m) => muted.has(m.friend_id));
+    return (
+      <View style={small ? styles.inlineActions : styles.actions}>
+        <View style={small ? styles.inlineAction : styles.action}>
+          <Button
+            title={allQuiet ? 'Unshhhh all' : 'Shhhh all'}
+            variant={allQuiet ? 'quietOn' : 'quiet'}
+            size={small ? 'small' : 'regular'}
+            onPress={() => toggleShushAll(label, members, allQuiet, group)}
+          />
+        </View>
+        <View style={small ? styles.inlineAction : styles.action}>
+          <Button
+            title={allMuted ? 'Unmute all' : 'Mute all'}
+            variant={allMuted ? 'quietOn' : 'quiet'}
+            size={small ? 'small' : 'regular'}
+            onPress={() => toggleGroupMute(members, allMuted)}
+          />
+        </View>
+      </View>
     );
   };
 
@@ -213,8 +263,6 @@ export default function FriendsScreen() {
             .map((id) => byId.get(id))
             .filter((friend): friend is FriendFeedRow => friend !== undefined)
             .sort(byPresence);
-          const allQuiet = members.length > 0 && members.every((m) => shushed[m.friend_id]);
-          const allMuted = members.length > 0 && members.every((m) => muted.has(m.friend_id));
           return (
             <View key={group.group_id} style={styles.section}>
               <View style={styles.groupHeader}>
@@ -223,35 +271,28 @@ export default function FriendsScreen() {
                   <Text style={styles.link}>Edit</Text>
                 </Pressable>
               </View>
-              {members.length > 0 ? (
-                <View style={styles.actions}>
-                  <View style={styles.action}>
-                    <Button
-                      title={allQuiet ? 'Unshhhh all' : 'Shhhh all'}
-                      variant={allQuiet ? 'primary' : 'secondary'}
-                      onPress={() => toggleGroup(group, allQuiet)}
-                    />
-                  </View>
-                  <View style={styles.action}>
-                    <Button
-                      title={allMuted ? 'Unmute all' : 'Mute all'}
-                      variant={allMuted ? 'primary' : 'secondary'}
-                      onPress={() => toggleGroupMute(members, allMuted)}
-                    />
-                  </View>
-                </View>
-              ) : null}
               {members.length === 0 ? (
                 <Text style={styles.muted}>Nobody in this group yet — tap Edit to add people.</Text>
               ) : (
                 members.map(friendCard)
               )}
+              {quietActions(group.name, members, group, false)}
             </View>
           );
         })}
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{groups.length > 0 ? 'Everyone else' : 'Friends'}</Text>
+          <View style={styles.groupHeader}>
+            <Text style={styles.sectionTitle}>
+              {groups.length > 0 ? 'Everyone else' : 'Friends'}
+            </Text>
+            {quietActions(
+              groups.length > 0 ? 'Everyone else' : 'your friends',
+              ungrouped,
+              null,
+              true
+            )}
+          </View>
           {ungrouped.length === 0 ? (
             <Text style={styles.muted}>
               {friends.length === 0 ? 'Invite someone to get started.' : 'Everyone is in a group.'}
@@ -302,9 +343,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  groupActions: {
+  inlineActions: {
     flexDirection: 'row',
-    gap: spacing.md,
+    gap: spacing.sm,
+  },
+  inlineAction: {
+    flexShrink: 1,
   },
   link: {
     color: colors.accent,

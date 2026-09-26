@@ -131,6 +131,11 @@ function RootNavigator() {
       router.push(postId ? `/(tabs)/profile?post=${postId}` : '/(tabs)');
       return;
     }
+    if (event === 'tagged') {
+      // Being named waits on a yes, and the You tab is where it is answered.
+      router.push('/(tabs)/profile');
+      return;
+    }
     if (friendId) {
       // A drink post opens on the photo it announced; everything else opens the
       // gallery as it stands.

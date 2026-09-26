@@ -27,7 +27,8 @@ type OutboxRow = {
     | 'requested'
     | 'commented'
     | 'reacted'
-    | 'reshared';
+    | 'reshared'
+    | 'tagged';
   body: string;
   token: string;
   post_id: string | null;

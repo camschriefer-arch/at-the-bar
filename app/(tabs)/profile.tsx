@@ -5,11 +5,20 @@ import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-na
 import { AddVenueModal } from '../../components/AddVenueModal';
 import { Avatar } from '../../components/Avatar';
 import { Button } from '../../components/Button';
+import { CompanionModal } from '../../components/CompanionModal';
 import { DrinkGallery } from '../../components/DrinkGallery';
 import { TopBars } from '../../components/TopBars';
 import { UploadDrinkModal } from '../../components/UploadDrinkModal';
 import { fetchMyProfile, fetchMyStatus, fetchTopBars, forgetBar } from '../../lib/api';
 import { useAuth } from '../../lib/AuthProvider';
+import {
+  currentVisit,
+  friendsAtBar,
+  pendingCompanionTags,
+  respondToCompanionTag,
+  visitCompanions,
+} from '../../lib/companions';
+import { confirmedNames, nameList, pendingNames } from '../../lib/companionText';
 import { fetchBlockedUsers, unblockUser, type BlockedUser } from '../../lib/moderation';
 import {
   getPermissionLevel,
@@ -31,7 +40,15 @@ import {
 import { isSharingEnabled, setSharingEnabled } from '../../lib/sharing';
 import { checkInAt, clearStatus, syncStatusForLocation } from '../../lib/statusSync';
 import { colors, spacing } from '../../lib/theme';
-import type { Bar, DrinkPost, Profile, TopBar } from '../../lib/types';
+import type {
+  Bar,
+  CompanionTag,
+  CurrentVisit,
+  DrinkPost,
+  Profile,
+  TopBar,
+  VisitCompanion,
+} from '../../lib/types';
 import { declinePendingVenue, getPendingVenue, type PendingVenue } from '../../lib/venuePrompt';
 
 export default function ProfileScreen() {
@@ -48,6 +65,10 @@ export default function ProfileScreen() {
   const [posts, setPosts] = useState<DrinkPost[]>([]);
   const [topBars, setTopBars] = useState<TopBar[]>([]);
   const [blocked, setBlocked] = useState<BlockedUser[]>([]);
+  const [visit, setVisit] = useState<CurrentVisit | null>(null);
+  const [companions, setCompanions] = useState<VisitCompanion[]>([]);
+  const [tags, setTags] = useState<CompanionTag[]>([]);
+  const [naming, setNaming] = useState<CurrentVisit | null>(null);
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -55,6 +76,14 @@ export default function ProfileScreen() {
   const [nothingNearby, setNothingNearby] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  /** Your current visit, who is on it, and anyone waiting on your answer. */
+  const loadCompanions = useCallback(async () => {
+    const [mine, waiting] = await Promise.all([currentVisit(), pendingCompanionTags()]);
+    setVisit(mine);
+    setTags(waiting);
+    setCompanions(mine ? await visitCompanions(mine.visit_id) : []);
+  }, []);
 
   const load = useCallback(async () => {
     if (!userId) return;
@@ -86,11 +115,12 @@ export default function ProfileScreen() {
       ]);
       setAvatarUrl(avatar);
       setPhotoUrls(urls);
+      await loadCompanions();
       setError(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not load your profile');
     }
-  }, [userId]);
+  }, [loadCompanions, userId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -168,6 +198,21 @@ export default function ProfileScreen() {
     }
   };
 
+  /**
+   * Straight after a check-in, if friends are already here, ask who the user is
+   * with. Nobody there is nothing to ask about, so the prompt stays away.
+   */
+  const offerCompanions = async () => {
+    try {
+      const mine = await currentVisit();
+      if (!mine) return;
+      const here = await friendsAtBar(mine.bar_id);
+      if (here.length > 0) setNaming(mine);
+    } catch {
+      // Being unable to look is not worth interrupting a check-in over.
+    }
+  };
+
   const confirmPending = async (barId: string) => {
     setBusy(true);
     setError(null);
@@ -175,10 +220,21 @@ export default function ProfileScreen() {
       await checkInAt(barId);
       setPending(null);
       await load();
+      await offerCompanions();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not check you in');
     } finally {
       setBusy(false);
+    }
+  };
+
+  const answerTag = async (tag: CompanionTag, accept: boolean) => {
+    setError(null);
+    try {
+      await respondToCompanionTag(tag.visit_id, accept);
+      setTags((current) => current.filter((row) => row.visit_id !== tag.visit_id));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not answer that');
     }
   };
 
@@ -190,6 +246,7 @@ export default function ProfileScreen() {
       setPending(null);
       setNothingNearby(false);
       await load();
+      await offerCompanions();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not check you in');
     } finally {
@@ -293,11 +350,50 @@ export default function ProfileScreen() {
             <Text style={styles.status}>At the bar</Text>
             <Text style={styles.barName}>{bar.name}</Text>
             <Text style={styles.muted}>{[bar.city, bar.state].filter(Boolean).join(', ')}</Text>
+            {confirmedNames(companions).length > 0 ? (
+              <Text style={styles.status}>with {nameList(confirmedNames(companions))}</Text>
+            ) : null}
+            {pendingNames(companions).length > 0 ? (
+              <Text style={styles.fineprint}>
+                Waiting on {nameList(pendingNames(companions))} to say yes. Until they do, only
+                you see it.
+              </Text>
+            ) : null}
+            {visit ? (
+              <View style={styles.actions}>
+                <Button
+                  title={companions.length > 0 ? 'Change who you are with' : 'Say who you are with'}
+                  variant="secondary"
+                  onPress={() => setNaming(visit)}
+                  disabled={busy}
+                />
+              </View>
+            ) : null}
           </>
         ) : (
           <Text style={styles.muted}>Not at a bar. Friends see nothing.</Text>
         )}
       </View>
+
+      {tags.map((tag) => (
+        <View key={tag.visit_id} style={styles.card}>
+          <Text style={styles.label}>Are you with them?</Text>
+          <Text style={styles.status}>
+            {tag.display_name} says you are with them at {tag.bar_name}.
+          </Text>
+          <Text style={styles.fineprint}>
+            Your name only shows on their check-in if you say yes.
+          </Text>
+          <View style={styles.actions}>
+            <Button title="Yes, I am" onPress={() => void answerTag(tag, true)} />
+            <Button
+              title="No"
+              variant="secondary"
+              onPress={() => void answerTag(tag, false)}
+            />
+          </View>
+        </View>
+      ))}
 
       {pending && sharing ? (
         <View style={styles.card}>
@@ -430,6 +526,15 @@ export default function ProfileScreen() {
           onSaved={addPost}
         />
       ) : null}
+
+      <CompanionModal
+        visitId={naming?.visit_id ?? null}
+        barId={naming?.bar_id ?? null}
+        barName={naming?.bar_name ?? null}
+        chosen={companions.map((person) => person.user_id)}
+        onClose={() => setNaming(null)}
+        onSaved={loadCompanions}
+      />
 
       <AddVenueModal
         visible={addingVenue}

@@ -97,6 +97,9 @@ declaring Precise Location because the app reads it on the device.
 WHY THIS APP USES BACKGROUND LOCATION
 The app's single purpose is letting a user tell accepted friends that they are out at a bar. Background location is required to notice that the user has arrived somewhere: the device compares its position, on-device, against a catalog of bars, and after the user has remained within about 0.1 miles of one for five minutes it asks them to confirm. Coordinates are never transmitted to the server. Only the identifier of the venue the user confirms is stored: as the current status, which is cleared when they leave, and as a check-in record that feeds the "frequently visited" list on their profile, which the user can delete per venue. The app has no ability to record or display a user's location at any other time.
 
+THE FEATURE THAT NEEDS PERSISTENT LOCATION
+Arrival detection is the app's core feature and it cannot work without continuous updates. The phone is in the user's pocket when they walk into a bar, so the app has to keep receiving fixes to (1) match the position against the on-device catalog, and (2) confirm the user is still at the same venue five minutes later, which is what separates settling in from walking past. Sitting still at a bar is the case that has to work, so movement-triggered options are not sufficient: region entry alone fires as the user passes the door and cannot establish the dwell, and significant-change updates are too coarse to tell one venue from its neighbours. Departure detection has the same requirement: the status is cleared automatically once the user is outside the venue's radius, which is only observable from ongoing updates. A screen recording of this happening on a physical device is attached to this submission.
+
 MODERATING USER CONTENT
 The only user-generated content is drink photos, their notes, and comments and emoji reactions on photos and on arrivals and departures. A user can share a photo they can see onto their own feed, which shows it to their accepted friends; nothing is ever visible without an accepted friendship, and there is no public timeline. Every post in the feed can be reported by anyone who can see it (long-press the card, or the post screen) and every author can be blocked, which hides both people's posts and comments from each other. Reports reach the developer, who removes content and accounts.
 
@@ -108,10 +111,13 @@ Demo account: cam.schriefer+review@gmail.com / <password, entered in App Store C
 
 ## Screenshots
 
+Captures must not show a non-iOS status bar or third-party map branding: App
+Review rejects both as references to another platform (2.3.10).
+
 Six-point-nine inch iPhone (1290 x 2796), in order:
 
 1. Friends list, one friend out at Jake & Joe's
-2. Friend detail with the venue map pin
+2. Feed with a friend's arrival, comments and a drink photo
 3. The confirmation prompt on the You tab
 4. Drink gallery
 5. Invite by link

@@ -30,6 +30,16 @@ export async function requestAlwaysPermission(): Promise<PermissionLevel> {
   return background.status === 'granted' ? 'background' : 'foreground';
 }
 
+/**
+ * Whether iOS has already put a location dialog in front of the user. Until it
+ * has, the explainer screen must lead straight into the request: App Review
+ * rejects a pre-prompt that can be dismissed without ever asking (5.1.1(iv)).
+ */
+export async function hasRequestedLocationPermission(): Promise<boolean> {
+  const foreground = await Location.getForegroundPermissionsAsync();
+  return foreground.status !== Location.PermissionStatus.UNDETERMINED;
+}
+
 export async function getPermissionLevel(): Promise<PermissionLevel> {
   const foreground = await Location.getForegroundPermissionsAsync();
   if (foreground.status !== 'granted') return 'denied';

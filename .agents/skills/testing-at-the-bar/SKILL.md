@@ -273,3 +273,55 @@ To test friend-detail UI, re-set the other user's status with service-role SQL:
   and force-stop + relaunch the app after reseeding — `expo-image` caches the old signed URLs.
 - Screenshot copy note: the single-venue prompt reads "ARE YOU HERE?" + the bar name with
   "Yes, I'm here" / "Not here"; it never literally says "Are you at <bar>?".
+- `adb shell wm size 1290x2796` on an ordinary AVD works for stills but the on-device H.264
+  encoder refuses that size: `screenrecord` prints
+  `unable to configure video/avc codec at 1290x2796 (err=-22)` and silently falls back to
+  720x1280. That is 9:16, so post-process to an App Store preview size with
+  `ffmpeg -i in.mp4 -filter:v "setpts=PTS/1.7,scale=1080:1920:flags=lanczos" -an -c:v libx264
+  -pix_fmt yuv420p -r 30 out.mp4` (the `setpts` speed-up also squeezes a slow adb-driven walk
+  into Apple's 15-30 s window). Verify with `ffprobe`.
+- adb taps issued back-to-back while `screenrecord` is running are frequently dropped, and the
+  app also lags several seconds behind. Allow 5-8 s per step, re-read bounds from a fresh
+  uiautomator dump right before each tap (a scroll that is still settling invalidates them), and
+  record longer than you need, then trim/speed up — do not trust a single unverified tap.
+- `geo fix` over the emulator console (port 5554 + `~/.emulator_console_auth_token`) is NOT
+  enough for this app's foreground `getCurrentPositionAsync`: "Check in now" spins and then
+  returns with no venue list. The test-provider loop (`/home/ubuntu/mockloc.sh <lat> <lng>
+  <secs>`, which registers and feeds both `gps` and `fused`) does work — use it, and keep it
+  running for the whole capture session.
+- If the app suddenly shows the sign-in screen mid-session, the stored Supabase session expired;
+  re-run `/home/ubuntu/signin.sh <email> <password>` (demo password lives in the seed script as
+  `DEMO_PASSWORD`). Symptoms before that can include buttons that appear to do nothing.
+- Fallback for setting a check-in when the UI path is unavailable: log in over PostgREST
+  (`/auth/v1/token?grant_type=password`) and `POST /rest/v1/rpc/set_current_bar {p_bar_id}`.
+  This is a diagnostic/fixture shortcut only — always label such a state as not UI-proven.
+- **After re-seeding `bars`, always clear the app's venue cache or check-in will fail.** The app
+  caches nearby venues per geo-tile in AsyncStorage (`atb:venues:<x>:<y>`, plus `atb:pendingVenue`,
+  `atb:promptedVenues`, `atb:declinedVenues`, `atb:sighting`). If the seed deleted/recreated the
+  bar rows, the prompt still offers the OLD uuid and `set_current_bar` returns **400 / `unknown
+  bar <uuid>`**; the UI only shows a generic red "Could not check you in" at the very BOTTOM of
+  the You ScrollView (below the drink grid and Sign out), so it is invisible in a uiautomator
+  dump unless you scroll all the way down. Inspect/clear the keys with:
+  `adb shell "run-as com.atthebar.app sqlite3 databases/RKStorage 'select key, substr(value,1,200)
+  from catalystLocalStorage'"` and a matching `delete from catalystLocalStorage where key like
+  'atb:venues%' or key in (...)` while the app is force-stopped (keep `sb-10-auth-token` to stay
+  signed in), then relaunch.
+- To see what a failing Supabase call returned, tail `docker logs -f supabase_kong_at-the-bar`
+  (method/path/status) and `docker logs supabase_db_at-the-bar` (the actual `ERROR:` + statement).
+  `adb logcat -s ReactNativeJS:V` is usually empty — the app does not log caught errors.
+- "Frequently visited" is empty for a fresh demo user and looks bad in marketing shots; seed a
+  few historical `check_ins` rows (arrived/departed pairs) so it reads "N visits · usually 2h".
+- **iPad/tablet-size stills (Apple's 13" slot, 2064x2752).** No new AVD is needed: on the existing
+  atb69 AVD `adb shell wm size 2064x2752` + `adb shell wm density 264` is accepted and the app
+  renders and screenshots at exactly that size (verify with `ffprobe -show_entries
+  stream=width,height`). Boot with `-memory 2560` and both swapfiles on; expect a "System UI isn't
+  responding" ANR right after the resize (recover with force-stop + relaunch of the app).
+- **At tablet widths (sw >= 600dp) Android draws the launcher taskbar (Gmail/Chrome icons) over
+  the bottom of every screenshot** — unusable for a store listing. `policy_control=immersive.*`
+  does NOT hide it. What works: `adb shell pm disable-user --user 0
+  com.google.android.apps.nexuslauncher`, then relaunch the app; re-enable with `pm enable --user 0`
+  when done. Disabling the launcher throws one `FATAL EXCEPTION` in `com.android.systemui`
+  (`OverviewProxyService`) — harmless, but account for it when counting crashes.
+- The app has no tablet layout: at 2064x2752/264 the phone layout is stretched full-width and the
+  Friends screen leaves ~60% of the frame empty. Flag that to whoever owns the listing; raising the
+  density (e.g. 360-460) fills more of the frame at the cost of larger UI.

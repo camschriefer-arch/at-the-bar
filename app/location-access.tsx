@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button } from '../components/Button';
 import {
+  hasRequestedLocationPermission,
   requestAlwaysPermission,
   requestLocationPermissions,
   startBackgroundUpdates,
@@ -23,6 +24,10 @@ import { colors, spacing } from '../lib/theme';
  * granted. iOS grants one Always upgrade prompt per install and never offers
  * Always in the first dialog, so the reason for it has to land before the user
  * is asked, and afterwards Settings is the only way back.
+ *
+ * Before the first dialog the only way on is Continue, which asks: an explainer
+ * that can be skipped without ever reaching the system request is a 5.1.1(iv)
+ * rejection.
  */
 export default function LocationAccess() {
   const router = useRouter();
@@ -31,12 +36,19 @@ export default function LocationAccess() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [returning, setReturning] = useState(false);
+  const [asked, setAsked] = useState(false);
 
   useEffect(() => {
     let stale = false;
     void hasSeenLocationIntro()
       .then((seen) => {
         if (!stale) setReturning(seen);
+      })
+      .catch(() => undefined);
+
+    void hasRequestedLocationPermission()
+      .then((requested) => {
+        if (!stale) setAsked(requested);
       })
       .catch(() => undefined);
 
@@ -64,6 +76,7 @@ export default function LocationAccess() {
     setError(null);
     try {
       const granted = await requestLocationPermissions();
+      setAsked(true);
       setLevel(granted);
 
       if (granted === 'background') {
@@ -160,7 +173,9 @@ export default function LocationAccess() {
             loading={busy}
           />
         )}
-        <Button title="Not now" variant="secondary" onPress={later} disabled={busy} />
+        {asked ? (
+          <Button title="Not now" variant="secondary" onPress={later} disabled={busy} />
+        ) : null}
       </View>
     </ScrollView>
   );

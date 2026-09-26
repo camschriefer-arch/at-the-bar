@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Avatar } from './Avatar';
 import { FeedSocial } from './FeedSocial';
 import { Stars } from './Stars';
+import { confirmedNames, nameList, pendingNames } from '../lib/companionText';
 import { colors, spacing } from '../lib/theme';
 import type { FeedItem } from '../lib/types';
 
@@ -23,10 +24,18 @@ function place(item: FeedItem): string | null {
   return where ? `${item.bar_name} · ${where}` : item.bar_name;
 }
 
-/** "Dan is at Jake n JOES", "Dan has left Jake n JOES". */
+/** "Dan is at Jake n JOES", "Dan has left Jake n JOES with Warren". */
 function visit(item: FeedItem): string {
   const verb = item.kind === 'check_out' ? 'has left' : 'is at';
-  return `${item.display_name} ${verb} ${item.bar_name ?? 'a bar'}`;
+  const names = nameList(confirmedNames(item.companion_list ?? []));
+  const company = names ? ` with ${names}` : '';
+  return `${item.display_name} ${verb} ${item.bar_name ?? 'a bar'}${company}`;
+}
+
+/** Only ever populated for the two people a claim is between. */
+function waitingOn(item: FeedItem): string | null {
+  const names = nameList(pendingNames(item.companion_list ?? []));
+  return names ? `Waiting on ${names} to say they are with you` : null;
 }
 
 function town(item: FeedItem): string | null {
@@ -115,6 +124,7 @@ export function FeedCard({
         <>
           <Text style={styles.place}>{visit(item)}</Text>
           {town(item) ? <Text style={styles.town}>{town(item)}</Text> : null}
+          {waitingOn(item) ? <Text style={styles.town}>{waitingOn(item)}</Text> : null}
           <FeedSocial item={item} onChanged={onChanged} />
         </>
       ) : place(item) ? (

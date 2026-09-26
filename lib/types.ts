@@ -86,6 +86,35 @@ export type FeedComment = {
 };
 
 /**
+ * Someone named on a visit. `pending` rows are only ever sent to the two
+ * people they concern: the one who did the naming, and the one named.
+ */
+export type VisitCompanion = {
+  user_id: string;
+  display_name: string;
+  pending: boolean;
+};
+
+/** Being told you are out with someone, waiting on your yes or no. */
+export type CompanionTag = {
+  visit_id: string;
+  user_id: string;
+  display_name: string;
+  avatar_url: string | null;
+  bar_id: string;
+  bar_name: string;
+  arrived_at: string;
+};
+
+/** The visit the user is on right now, if any. */
+export type CurrentVisit = {
+  visit_id: string;
+  bar_id: string;
+  bar_name: string;
+  arrived_at: string;
+};
+
+/**
  * A row of the feed. A post carries its photo and drink, a check-in or a
  * check-out only the venue; all are a friend's, or your own. A visit yields one
  * of each, keyed by kind, so the two ends of it sit where they happened.
@@ -120,6 +149,8 @@ export type FeedItem = {
   reactions: number;
   comment_list: FeedComment[];
   reaction_list: DrinkPostReaction[];
+  /** Who the person was with, on a check-in or a check-out. */
+  companion_list: VisitCompanion[];
   created_at: string;
 };
 

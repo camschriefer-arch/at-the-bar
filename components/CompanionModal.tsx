@@ -35,13 +35,19 @@ export function CompanionModal({
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [openedFor, setOpenedFor] = useState<string | null>(null);
+
+  // Opening on a new visit starts over: who is here is fetched again, and the
+  // ticks go back to whoever is already on that visit.
+  if (visitId !== openedFor) {
+    setOpenedFor(visitId);
+    setLoading(true);
+    setPicked(chosen ? [...chosen] : []);
+  }
 
   useEffect(() => {
     if (!barId) return;
     let stale = false;
-
-    setLoading(true);
-    setPicked(chosen ? [...chosen] : []);
 
     friendsAtBar(barId)
       .then((here) => {
@@ -60,8 +66,6 @@ export function CompanionModal({
     return () => {
       stale = true;
     };
-    // `chosen` is the starting state, read once per opening.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [barId, visitId]);
 
   const toggle = (friendId: string) => {

@@ -8,6 +8,8 @@ import {
   MAX_CHOICES,
   noteQuiet,
   noteSighting,
+  parseSighting,
+  SIGHTING_GAP_MS,
   stillAt,
   venuesToConfirm,
 } from '../lib/venues.ts';
@@ -76,35 +78,63 @@ test('leaving a confirmed venue clears the status', () => {
 test('a first sighting starts the clock and counts for nothing', () => {
   const { sighting, dwelled } = noteSighting(null, ['jakes'], 1_000);
 
-  assert.equal(dwelled, false);
-  assert.deepEqual(sighting, { jakes: 1_000 });
+  assert.deepEqual(dwelled, []);
+  assert.deepEqual(sighting, { jakes: { since: 1_000, last: 1_000 } });
 });
 
 test('walking past for less than the dwell never counts', () => {
   const first = noteSighting(null, ['jakes'], 0).sighting;
 
-  assert.equal(noteSighting(first, ['jakes'], DWELL_MS - 1).dwelled, false);
-  assert.equal(noteSighting(first, ['jakes'], DWELL_MS).dwelled, true);
+  assert.deepEqual(noteSighting(first, ['jakes'], DWELL_MS - 1).dwelled, []);
+  assert.deepEqual(noteSighting(first, ['jakes'], DWELL_MS).dwelled, ['jakes']);
 });
 
 test('a neighbour drifting in and out does not restart the clock', () => {
   const first = noteSighting(null, ['jakes', 'pub'], 0).sighting;
   const second = noteSighting(first, ['jakes'], DWELL_MS / 2).sighting;
 
-  assert.deepEqual(second, { jakes: 0 });
-  assert.equal(noteSighting(second, ['jakes', 'pub'], DWELL_MS).dwelled, true);
+  assert.deepEqual(second, { jakes: { since: 0, last: DWELL_MS / 2 } });
+  assert.deepEqual(noteSighting(second, ['jakes', 'pub'], DWELL_MS).dwelled, ['jakes']);
+});
+
+test('a venue only just in range is not carried by a neighbour that dwelled', () => {
+  const first = noteSighting(null, ['jakes'], 0).sighting;
+
+  assert.deepEqual(noteSighting(first, ['jakes', 'pub'], DWELL_MS).dwelled, ['jakes']);
 });
 
 test('moving to another venue restarts the clock', () => {
   const first = noteSighting(null, ['jakes'], 0).sighting;
   const second = noteSighting(first, ['pub'], DWELL_MS).sighting;
 
-  assert.deepEqual(second, { pub: DWELL_MS });
-  assert.equal(noteSighting(second, ['pub'], DWELL_MS + 1).dwelled, false);
+  assert.deepEqual(second, { pub: { since: DWELL_MS, last: DWELL_MS } });
+  assert.deepEqual(noteSighting(second, ['pub'], DWELL_MS + 1).dwelled, []);
+});
+
+test('a gap in sightings ends the stay rather than satisfying the dwell', () => {
+  const first = noteSighting(null, ['jakes'], 0).sighting;
+  const later = SIGHTING_GAP_MS + 1;
+
+  // The app hears nothing while iOS has the task suspended, so the fix it gets
+  // on reopening starts a new stay instead of closing an hours-old one.
+  const second = noteSighting(first, ['jakes'], later);
+  assert.deepEqual(second.dwelled, []);
+  assert.deepEqual(second.sighting, { jakes: { since: later, last: later } });
 });
 
 test('a clock from the future is restarted rather than trusted', () => {
-  assert.deepEqual(noteSighting({ jakes: 10_000 }, ['jakes'], 1_000).sighting, { jakes: 1_000 });
+  assert.deepEqual(
+    noteSighting({ jakes: { since: 10_000, last: 10_000 } }, ['jakes'], 1_000).sighting,
+    { jakes: { since: 1_000, last: 1_000 } }
+  );
+});
+
+test('a sighting written before stays were timed out is not trusted', () => {
+  assert.deepEqual(parseSighting(JSON.stringify({ jakes: 0 })), {});
+  assert.deepEqual(parseSighting('not json'), null);
+  assert.deepEqual(parseSighting(JSON.stringify({ jakes: { since: 0, last: 5 } })), {
+    jakes: { since: 0, last: 5 },
+  });
 });
 
 test('a venue stays quiet for its period and speaks up after it', () => {

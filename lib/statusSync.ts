@@ -26,8 +26,8 @@ async function readSighting(): Promise<Sighting | null> {
   }
 }
 
-/** Whether the user has been near one of `barIds` long enough for it to count. */
-async function hasDwelled(barIds: readonly string[]): Promise<boolean> {
+/** Which of `barIds` the user has been near long enough for them to count. */
+async function dwelledVenues(barIds: readonly string[]): Promise<string[]> {
   const { sighting, dwelled } = noteSighting(await readSighting(), barIds, Date.now());
   await AsyncStorage.setItem(SIGHTING_KEY, JSON.stringify(sighting));
   return dwelled;
@@ -67,8 +67,10 @@ async function writeStatus(barId: string | null): Promise<void> {
  * that prompt: the bar downstairs from an office would otherwise have people at
  * the bar all day. A user who is travelling is never asked, however long the
  * venues around them have been in range: a walk down a street of bars is not a
- * visit to any of them. `immediate` skips the dwell, the motion check and the
- * quiet periods, for a prompt the user asked for by hand.
+ * visit to any of them. Only the venues that have each served out the dwell
+ * are offered, so a bar the user has only just reached is not carried in by a
+ * neighbour they had been sitting near. `immediate` skips the dwell, the
+ * motion check and the quiet periods, for a prompt the user asked for by hand.
  */
 export async function syncStatusForLocation(
   point: LatLng,
@@ -108,9 +110,14 @@ export async function syncStatusForLocation(
     return { bar: null, changed: left };
   }
 
-  if (immediate || (await hasDwelled(candidates.map((venue) => venue.id)))) {
-    await promptForVenues(candidates, { force: immediate });
+  if (immediate) {
+    await promptForVenues(candidates, { force: true });
+    return { bar: null, changed: left };
   }
+
+  const dwelled = await dwelledVenues(candidates.map((venue) => venue.id));
+  const asked = candidates.filter((venue) => dwelled.includes(venue.id));
+  if (asked.length > 0) await promptForVenues(asked);
 
   return { bar: null, changed: left };
 }

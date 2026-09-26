@@ -76,15 +76,15 @@ test('leaving a confirmed venue clears the status', () => {
 test('a first sighting starts the clock and counts for nothing', () => {
   const { sighting, dwelled } = noteSighting(null, ['jakes'], 1_000);
 
-  assert.equal(dwelled, false);
+  assert.deepEqual(dwelled, []);
   assert.deepEqual(sighting, { jakes: 1_000 });
 });
 
 test('walking past for less than the dwell never counts', () => {
   const first = noteSighting(null, ['jakes'], 0).sighting;
 
-  assert.equal(noteSighting(first, ['jakes'], DWELL_MS - 1).dwelled, false);
-  assert.equal(noteSighting(first, ['jakes'], DWELL_MS).dwelled, true);
+  assert.deepEqual(noteSighting(first, ['jakes'], DWELL_MS - 1).dwelled, []);
+  assert.deepEqual(noteSighting(first, ['jakes'], DWELL_MS).dwelled, ['jakes']);
 });
 
 test('a neighbour drifting in and out does not restart the clock', () => {
@@ -92,7 +92,13 @@ test('a neighbour drifting in and out does not restart the clock', () => {
   const second = noteSighting(first, ['jakes'], DWELL_MS / 2).sighting;
 
   assert.deepEqual(second, { jakes: 0 });
-  assert.equal(noteSighting(second, ['jakes', 'pub'], DWELL_MS).dwelled, true);
+  assert.deepEqual(noteSighting(second, ['jakes', 'pub'], DWELL_MS).dwelled, ['jakes']);
+});
+
+test('a venue only just in range is not carried by a neighbour that dwelled', () => {
+  const first = noteSighting(null, ['jakes'], 0).sighting;
+
+  assert.deepEqual(noteSighting(first, ['jakes', 'pub'], DWELL_MS).dwelled, ['jakes']);
 });
 
 test('moving to another venue restarts the clock', () => {
@@ -100,7 +106,7 @@ test('moving to another venue restarts the clock', () => {
   const second = noteSighting(first, ['pub'], DWELL_MS).sighting;
 
   assert.deepEqual(second, { pub: DWELL_MS });
-  assert.equal(noteSighting(second, ['pub'], DWELL_MS + 1).dwelled, false);
+  assert.deepEqual(noteSighting(second, ['pub'], DWELL_MS + 1).dwelled, []);
 });
 
 test('a clock from the future is restarted rather than trusted', () => {

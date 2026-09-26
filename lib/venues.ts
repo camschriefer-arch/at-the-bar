@@ -34,23 +34,27 @@ export const DWELL_MS = 5 * 60 * 1000;
 export type Sighting = Record<string, number>;
 
 /**
- * Folds a sighting of `barIds` into what we knew, and says whether any one of
- * them has been in range long enough. Each venue keeps its own clock: which
- * venues are in range flips with GPS jitter, and a shared clock would restart
- * every time a neighbour drifted in or out.
+ * Folds a sighting of `barIds` into what we knew, and says which of them have
+ * been in range long enough. Each venue keeps its own clock, and answers for
+ * itself alone: which venues are in range flips with GPS jitter, and a shared
+ * clock would both restart every time a neighbour drifted in or out and let
+ * the bar next door vouch for one the user has only just reached.
  */
 export function noteSighting(
   previous: Sighting | null,
   barIds: readonly string[],
   now: number
-): { sighting: Sighting; dwelled: boolean } {
+): { sighting: Sighting; dwelled: string[] } {
   const sighting: Sighting = {};
   for (const barId of barIds) {
     const since = previous?.[barId];
     sighting[barId] = since !== undefined && since <= now ? since : now;
   }
 
-  const dwelled = Object.values(sighting).some((since) => now - since >= DWELL_MS);
+  const dwelled = Object.entries(sighting)
+    .filter(([, since]) => now - since >= DWELL_MS)
+    .map(([barId]) => barId);
+
   return { sighting, dwelled };
 }
 

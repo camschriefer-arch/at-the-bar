@@ -1,4 +1,5 @@
 import { allWithin, AT_BAR_RADIUS_METERS, nearestWithin, type LatLng } from './geo.ts';
+import { FIX_STALE_MS } from './motion.ts';
 import type { Bar } from './types';
 
 /**
@@ -30,8 +31,46 @@ export function stillAt(
  */
 export const DWELL_MS = 5 * 60 * 1000;
 
-/** When each venue currently in range was first seen. */
-export type Sighting = Record<string, number>;
+/** When each venue currently in range was first seen, and last seen. */
+export type Sighting = Record<string, { since: number; last: number }>;
+
+/**
+ * How long a gap in sightings ends a stay. The app stops being told where the
+ * phone is whenever iOS suspends the task, so a clock left running across a
+ * gap says nothing: reopening the app hours later would otherwise satisfy the
+ * dwell on the first fix and ask straight away.
+ */
+export const SIGHTING_GAP_MS = FIX_STALE_MS;
+
+/**
+ * Reads back a stored sighting, dropping anything that is not one. Entries
+ * written before venues recorded when they were last seen are read as a stay
+ * that ended, since there is no telling how long ago they were written.
+ */
+export function parseSighting(raw: string | null): Sighting | null {
+  if (!raw) return null;
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+
+  if (typeof parsed !== 'object' || parsed === null) return null;
+
+  const sighting: Sighting = {};
+  for (const [barId, seen] of Object.entries(parsed)) {
+    if (typeof seen !== 'object' || seen === null) continue;
+
+    const { since, last } = seen as { since?: unknown; last?: unknown };
+    if (typeof since !== 'number' || typeof last !== 'number') continue;
+
+    sighting[barId] = { since, last };
+  }
+
+  return sighting;
+}
 
 /**
  * Folds a sighting of `barIds` into what we knew, and says which of them have
@@ -47,12 +86,18 @@ export function noteSighting(
 ): { sighting: Sighting; dwelled: string[] } {
   const sighting: Sighting = {};
   for (const barId of barIds) {
-    const since = previous?.[barId];
-    sighting[barId] = since !== undefined && since <= now ? since : now;
+    const seen = previous?.[barId];
+    const running =
+      seen !== undefined &&
+      seen.since <= now &&
+      seen.last <= now &&
+      now - seen.last <= SIGHTING_GAP_MS;
+
+    sighting[barId] = { since: running ? seen.since : now, last: now };
   }
 
   const dwelled = Object.entries(sighting)
-    .filter(([, since]) => now - since >= DWELL_MS)
+    .filter(([, seen]) => now - seen.since >= DWELL_MS)
     .map(([barId]) => barId);
 
   return { sighting, dwelled };

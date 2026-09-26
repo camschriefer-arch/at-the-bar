@@ -5,7 +5,7 @@ import { type LatLng } from './geo';
 import { flushPendingNotifications } from './notifications';
 import { supabase } from './supabase';
 import { isMoving, type Fix } from './motion';
-import { noteSighting, stillAt, venuesToConfirm, type Sighting } from './venues';
+import { noteSighting, parseSighting, stillAt, venuesToConfirm } from './venues';
 import { allowVenue, clearPendingVenue, promptForVenues } from './venuePrompt';
 import type { Bar } from './types';
 
@@ -15,20 +15,10 @@ const FIX_KEY = 'atb:lastFix';
 
 export type ResolvedStatus = { bar: Bar | null; changed: boolean };
 
-async function readSighting(): Promise<Sighting | null> {
-  const raw = await AsyncStorage.getItem(SIGHTING_KEY);
-  if (!raw) return null;
-
-  try {
-    return JSON.parse(raw) as Sighting;
-  } catch {
-    return null;
-  }
-}
-
 /** Which of `barIds` the user has been near long enough for them to count. */
 async function dwelledVenues(barIds: readonly string[]): Promise<string[]> {
-  const { sighting, dwelled } = noteSighting(await readSighting(), barIds, Date.now());
+  const previous = parseSighting(await AsyncStorage.getItem(SIGHTING_KEY));
+  const { sighting, dwelled } = noteSighting(previous, barIds, Date.now());
   await AsyncStorage.setItem(SIGHTING_KEY, JSON.stringify(sighting));
   return dwelled;
 }

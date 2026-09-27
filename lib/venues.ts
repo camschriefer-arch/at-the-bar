@@ -103,6 +103,21 @@ export function noteSighting(
   return { sighting, dwelled };
 }
 
+/**
+ * A venue is only asked about once per visit: long enough that walking past the
+ * same bar twice in an evening does not nag, short enough that going back the
+ * next day asks again.
+ */
+export const PROMPT_COOLDOWN_MS = 6 * 60 * 60 * 1000;
+
+/**
+ * How long "Not here" lasts. The venues a user turns down are the ones they
+ * pass every day — the cafe by the office, the restaurant under the gym — so
+ * asking again tomorrow asks forever. Two weeks answers once a fortnight,
+ * while still catching the day they do go in.
+ */
+export const DECLINE_QUIET_MS = 14 * 24 * 60 * 60 * 1000;
+
 /** When each venue was last asked about, or last turned down. */
 export type QuietVenues = Record<string, number>;
 

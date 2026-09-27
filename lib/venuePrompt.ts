@@ -2,7 +2,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 
 import type { Bar } from './types';
-import { isQuiet, noteQuiet, type QuietVenues } from './venues';
+import {
+  DECLINE_QUIET_MS,
+  isQuiet,
+  noteQuiet,
+  PROMPT_COOLDOWN_MS,
+  type QuietVenues,
+} from './venues';
 
 export const VENUE_PROMPT_CATEGORY = 'venue.confirm';
 export const VENUE_PROMPT_CONFIRM = 'venue.confirm.yes';
@@ -11,21 +17,6 @@ export const VENUE_PROMPT_DISMISS = 'venue.confirm.no';
 const PENDING_KEY = 'atb:pendingVenue';
 const PROMPTED_KEY = 'atb:promptedVenues';
 const DECLINED_KEY = 'atb:declinedVenues';
-
-/**
- * A venue is only asked about once per visit: long enough that walking past the
- * same bar twice in an evening does not nag, short enough that going back the
- * next day asks again.
- */
-const PROMPT_COOLDOWN_MS = 6 * 60 * 60 * 1000;
-
-/**
- * How long "Not here" lasts. The venues a user turns down are the ones they
- * pass every day — the cafe by the office, the restaurant under the gym — so
- * asking again tomorrow asks forever. Two weeks answers once a fortnight,
- * while still catching the day they do go in.
- */
-export const DECLINE_QUIET_MS = 14 * 24 * 60 * 60 * 1000;
 
 export type PendingChoice = { barId: string; barName: string };
 
@@ -93,22 +84,45 @@ export async function isSuppressed(barId: string): Promise<boolean> {
 }
 
 /**
- * Records that the user said they are not at the venues they were asked about.
- * Turning a prompt down is the clearest signal the app gets that a venue is
+ * Records that the user said they are not at the venue they were asked about.
+ * Turning down a single venue is the clearest signal the app gets that it is
  * somewhere the user passes rather than goes, so it is worth remembering for
- * much longer than an unanswered prompt.
+ * much longer than an unanswered prompt. "None of these" is not that signal:
+ * it is one answer about several venues, on a block the user is evidently on,
+ * so it only holds for the usual cooldown rather than silencing every bar
+ * around them for a fortnight.
  */
 export async function declinePendingVenue(): Promise<void> {
   const pending = await getPendingVenue();
-  if (pending) {
+  const choices = pending?.choices ?? [];
+  if (choices.length > 0) {
+    const one = choices.length === 1;
     await recordQuiet(
-      DECLINED_KEY,
-      pending.choices.map((choice) => choice.barId),
-      DECLINE_QUIET_MS
+      one ? DECLINED_KEY : PROMPTED_KEY,
+      choices.map((choice) => choice.barId),
+      one ? DECLINE_QUIET_MS : PROMPT_COOLDOWN_MS
     );
   }
 
   await clearPendingVenue();
+}
+
+/** The two quiet periods as they stand, for explaining a prompt that never came. */
+export async function quietVenues(): Promise<{
+  prompted: QuietVenues;
+  declined: QuietVenues;
+}> {
+  const [prompted, declined] = await Promise.all([
+    readQuiet(PROMPTED_KEY),
+    readQuiet(DECLINED_KEY),
+  ]);
+
+  return { prompted, declined };
+}
+
+/** Drops both quiet periods, for a user who wants to be asked again now. */
+export async function askAgainEverywhere(): Promise<void> {
+  await AsyncStorage.multiRemove([PROMPTED_KEY, DECLINED_KEY]);
 }
 
 /**

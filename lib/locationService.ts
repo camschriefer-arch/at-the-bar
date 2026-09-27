@@ -84,6 +84,11 @@ export async function resumeBackgroundUpdates(): Promise<void> {
   await startBackgroundUpdates();
 }
 
+/** Whether the OS is currently feeding the background task. */
+export async function isBackgroundUpdatesRunning(): Promise<boolean> {
+  return Location.hasStartedLocationUpdatesAsync(BACKGROUND_LOCATION_TASK);
+}
+
 export async function stopBackgroundUpdates(): Promise<void> {
   if (await Location.hasStartedLocationUpdatesAsync(BACKGROUND_LOCATION_TASK)) {
     await Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK);

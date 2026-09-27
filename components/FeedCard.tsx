@@ -57,6 +57,10 @@ type FeedCardProps = {
   onShare?: () => void;
   /** Whether the share this card is of is yours. */
   sharedByYou?: boolean;
+  /** Left out unless this is a friend still at the venue. */
+  onJoin?: () => void;
+  /** Whether the card already names the user as being with them. */
+  joined?: boolean;
 };
 
 export function FeedCard({
@@ -69,6 +73,8 @@ export function FeedCard({
   onChanged,
   onShare,
   sharedByYou,
+  onJoin,
+  joined,
 }: FeedCardProps) {
   const isVisit = item.kind === 'check_in' || item.kind === 'check_out';
   const sharedBy =
@@ -125,6 +131,28 @@ export function FeedCard({
           <Text style={styles.place}>{visit(item)}</Text>
           {town(item) ? <Text style={styles.town}>{town(item)}</Text> : null}
           {waitingOn(item) ? <Text style={styles.town}>{waitingOn(item)}</Text> : null}
+          {onJoin ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={
+                joined
+                  ? `You are out with ${item.display_name}`
+                  : `Join ${item.display_name} at ${item.bar_name ?? 'the bar'}`
+              }
+              hitSlop={spacing.xs}
+              disabled={joined}
+              style={({ pressed }) => [styles.join, pressed && styles.sharePressed]}
+              onPress={onJoin}>
+              <Ionicons
+                name={joined ? 'people' : 'person-add-outline'}
+                size={18}
+                color={joined ? colors.accent : colors.muted}
+              />
+              <Text style={[styles.shareLabel, joined && styles.shareLabelOn]}>
+                {joined ? 'Out with them' : 'Join'}
+              </Text>
+            </Pressable>
+          ) : null}
           <FeedSocial item={item} onChanged={onChanged} />
         </>
       ) : place(item) ? (
@@ -263,6 +291,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.xs,
     paddingVertical: spacing.xs,
+  },
+  join: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    paddingBottom: spacing.sm,
   },
   sharePressed: {
     opacity: 0.6,

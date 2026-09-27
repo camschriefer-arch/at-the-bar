@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { asReaction } from '../lib/emoji';
@@ -22,6 +22,9 @@ type ReactionsProps = {
  */
 export function Reactions({ rows, onReact, onCard }: ReactionsProps) {
   const [draft, setDraft] = useState<string | null>(null);
+  // Done both submits and blurs the box, and neither handler sees the other's
+  // state in time, so what was typed lives here as well.
+  const typed = useRef<string | null>(null);
 
   const used = rows.map((row) => row.emoji).filter((emoji) => !OFFERED.includes(emoji));
   const chipStyle = [styles.chip, onCard ? styles.chipOnCard : null];
@@ -30,9 +33,20 @@ export function Reactions({ rows, onReact, onCard }: ReactionsProps) {
   // own, so the box waits to be sent rather than reacting to the first thing
   // that reads as an emoji.
   const send = () => {
-    const emoji = draft === null ? null : asReaction(draft);
+    const emoji = typed.current === null ? null : asReaction(typed.current);
+    typed.current = null;
     setDraft(null);
     if (emoji) onReact(emoji);
+  };
+
+  const open = () => {
+    typed.current = '';
+    setDraft('');
+  };
+
+  const type = (text: string) => {
+    typed.current = text;
+    setDraft(text);
   };
 
   return (
@@ -57,14 +71,14 @@ export function Reactions({ rows, onReact, onCard }: ReactionsProps) {
           accessibilityRole="button"
           accessibilityLabel="React with another emoji"
           style={chipStyle}
-          onPress={() => setDraft('')}>
+          onPress={open}>
           <Ionicons name="add" size={16} color={colors.muted} />
         </Pressable>
       ) : (
         <TextInput
           style={[chipStyle, styles.input]}
           value={draft}
-          onChangeText={setDraft}
+          onChangeText={type}
           onSubmitEditing={send}
           onBlur={send}
           placeholder="😀"

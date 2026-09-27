@@ -26,15 +26,13 @@ export function Reactions({ rows, onReact, onCard }: ReactionsProps) {
   const used = rows.map((row) => row.emoji).filter((emoji) => !OFFERED.includes(emoji));
   const chipStyle = [styles.chip, onCard ? styles.chipOnCard : null];
 
-  const pick = (text: string) => {
-    const emoji = asReaction(text);
-    if (!emoji) {
-      setDraft(text);
-      return;
-    }
-
+  // A skin tone or the second half of a flag arrives as a keystroke of its
+  // own, so the box waits to be sent rather than reacting to the first thing
+  // that reads as an emoji.
+  const send = () => {
+    const emoji = draft === null ? null : asReaction(draft);
     setDraft(null);
-    onReact(emoji);
+    if (emoji) onReact(emoji);
   };
 
   return (
@@ -66,11 +64,13 @@ export function Reactions({ rows, onReact, onCard }: ReactionsProps) {
         <TextInput
           style={[chipStyle, styles.input]}
           value={draft}
-          onChangeText={pick}
-          onBlur={() => setDraft(null)}
+          onChangeText={setDraft}
+          onSubmitEditing={send}
+          onBlur={send}
           placeholder="😀"
           placeholderTextColor={colors.muted}
-          accessibilityLabel="Type an emoji to react with"
+          accessibilityLabel="Type an emoji to react with, then close the keyboard"
+          returnKeyType="done"
           autoFocus
         />
       )}

@@ -17,5 +17,9 @@ test('turns away anything that is a comment rather than a reaction', () => {
   assert.equal(asReaction('nice'), null);
   assert.equal(asReaction('🍺 cheers'), null);
   assert.equal(asReaction('!!'), null);
+  assert.equal(asReaction('你好'), null);
+  assert.equal(asReaction('。'), null);
+  assert.equal(asReaction('—'), null);
+  assert.equal(asReaction('🏽'), null);
   assert.equal(asReaction('🍺🍺🍺🍺🍺🍺🍺🍺🍺'), null);
 });

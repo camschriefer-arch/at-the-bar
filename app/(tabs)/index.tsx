@@ -12,6 +12,7 @@ import {
 import { FeedCard } from "../../components/FeedCard";
 import { ReportModal } from "../../components/ReportModal";
 import { useAuth } from "../../lib/AuthProvider";
+import { failureMessage } from "../../lib/failureMessage";
 import {
   FEED_PAGE_SIZE,
   fetchFeed,
@@ -20,6 +21,7 @@ import {
   sharePost,
   unsharePost,
 } from "../../lib/feed";
+import { checkInToJoin, joinState, joinVisit } from "../../lib/join";
 import { blockUser } from "../../lib/moderation";
 import { signedAvatarUrlsFor, signedDrinkUrlsFor } from "../../lib/photos";
 import { colors, spacing } from "../../lib/theme";
@@ -157,6 +159,58 @@ export default function FeedScreen() {
     }
   };
 
+  /**
+   * Saying you are with a friend who is already out. It hangs off your own
+   * visit, so someone who has not checked in yet is checked in at their venue
+   * first, and your name only shows on their card once they say yes.
+   */
+  const join = async (item: FeedItem) => {
+    const barId = item.bar_id;
+    if (!barId) return;
+
+    const say = async (visitId: string) => {
+      await joinVisit(visitId, item.user_id);
+      await load();
+      Alert.alert(
+        `Asked ${item.display_name}`,
+        `Your friends see you out together once ${item.display_name} says yes.`,
+      );
+    };
+
+    const checkInAndSay = async () => {
+      try {
+        const visit = await checkInToJoin(barId);
+        await say(visit.visit_id);
+      } catch (cause) {
+        Alert.alert(
+          "Could not join",
+          failureMessage(cause, "Try again"),
+        );
+      }
+    };
+
+    try {
+      const state = await joinState(barId);
+      if (state.kind === "ready") {
+        await say(state.visit.visit_id);
+        return;
+      }
+
+      Alert.alert(
+        `Join ${item.display_name}?`,
+        state.at
+          ? `You are checked in at ${state.at}. Joining moves you to ${item.bar_name}.`
+          : `Joining checks you in at ${item.bar_name}.`,
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Check in and join", onPress: () => void checkInAndSay() },
+        ],
+      );
+    } catch (cause) {
+      Alert.alert("Could not join", failureMessage(cause, "Try again"));
+    }
+  };
+
   const block = (item: FeedItem) => {
     Alert.alert(
       `Block ${item.display_name}?`,
@@ -275,6 +329,16 @@ export default function FeedScreen() {
                 : undefined
             }
             sharedByYou={item.sharer_id === userId}
+            onJoin={
+              item.kind === "check_in" &&
+              item.bar_id &&
+              item.user_id !== userId
+                ? () => void join(item)
+                : undefined
+            }
+            joined={item.companion_list.some(
+              (person) => person.user_id === userId,
+            )}
           />
         )}
       />

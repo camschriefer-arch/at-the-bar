@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { confirmedNames, nameList, pendingNames } from '../lib/companionText.ts';
+import { confirmedNames, nameList, pendingNames, withCompanion } from '../lib/companionText.ts';
 
 const companions = [
   { user_id: 'a', display_name: 'Warren', pending: false },
@@ -19,4 +19,13 @@ test('reads a list the way it is said out loud', () => {
 test('separates who has said yes from who has not answered', () => {
   assert.deepEqual(confirmedNames(companions), ['Warren', 'Sam']);
   assert.deepEqual(pendingNames(companions), ['Pete']);
+});
+
+test('joining keeps whoever the visit already names', () => {
+  assert.deepEqual(withCompanion(companions, 'd'), ['a', 'b', 'c', 'd']);
+  assert.deepEqual(withCompanion([], 'd'), ['d']);
+});
+
+test('joining twice is still one claim', () => {
+  assert.deepEqual(withCompanion(companions, 'b'), ['a', 'b', 'c']);
 });

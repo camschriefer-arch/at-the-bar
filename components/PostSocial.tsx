@@ -1,4 +1,4 @@
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
@@ -8,11 +8,12 @@ import {
   deleteComment,
   fetchComments,
   fetchReactions,
-  REACTION_EMOJIS,
   toggleReaction,
 } from '../lib/social';
 import { colors, spacing } from '../lib/theme';
 import type { DrinkPostComment, DrinkPostReaction } from '../lib/types';
+import { CommentRow } from './CommentRow';
+import { Reactions } from './Reactions';
 
 const COMMENT_LIMIT = 500;
 
@@ -25,7 +26,6 @@ type PostSocialProps = {
 /** Emoji reactions and the comment thread under one drink photo. */
 export function PostSocial({ postId, ownerId }: PostSocialProps) {
   const { session } = useAuth();
-  const router = useRouter();
   const userId = session?.user.id ?? null;
 
   const [reactions, setReactions] = useState<DrinkPostReaction[]>([]);
@@ -90,39 +90,19 @@ export function PostSocial({ postId, ownerId }: PostSocialProps) {
 
   return (
     <View style={styles.container}>
-      <View style={styles.reactions}>
-        {REACTION_EMOJIS.map((emoji) => {
-          const row = reactions.find((reaction) => reaction.emoji === emoji);
-          return (
-            <Pressable
-              key={emoji}
-              accessibilityRole="button"
-              accessibilityLabel={`React with ${emoji}`}
-              style={[styles.chip, row?.reacted ? styles.chipOn : null]}
-              onPress={() => void react(emoji)}>
-              <Text style={styles.emoji}>{emoji}</Text>
-              {row ? <Text style={styles.count}>{row.reactions}</Text> : null}
-            </Pressable>
-          );
-        })}
-      </View>
+      <Reactions rows={reactions} onReact={(emoji) => void react(emoji)} />
 
       {comments.map((comment) => (
-        <View key={comment.id} style={styles.comment}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Open ${comment.display_name}`}
-            disabled={comment.author_id === userId}
-            onPress={() => router.push(`/user/${comment.author_id}`)}>
-            <Text style={styles.author}>{comment.display_name}</Text>
-          </Pressable>
-          <Text style={styles.body}>{comment.body}</Text>
-          {comment.author_id === userId || ownerId === userId ? (
-            <Pressable accessibilityRole="button" onPress={() => void remove(comment)}>
-              <Text style={styles.delete}>Delete</Text>
-            </Pressable>
-          ) : null}
-        </View>
+        <CommentRow
+          key={comment.id}
+          comment={comment}
+          userId={userId}
+          onDelete={
+            comment.author_id === userId || ownerId === userId
+              ? () => void remove(comment)
+              : undefined
+          }
+        />
       ))}
 
       <View style={styles.composer}>
@@ -152,46 +132,6 @@ const styles = StyleSheet.create({
   container: {
     gap: spacing.sm,
     marginTop: spacing.sm,
-  },
-  reactions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.xs,
-  },
-  chip: {
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: 16,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 4,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 6,
-  },
-  chipOn: {
-    borderColor: colors.accent,
-  },
-  emoji: {
-    fontSize: 16,
-  },
-  count: {
-    color: colors.muted,
-    fontSize: 13,
-  },
-  comment: {
-    gap: 2,
-  },
-  author: {
-    color: colors.text,
-    fontWeight: '700',
-  },
-  body: {
-    color: colors.muted,
-  },
-  delete: {
-    color: colors.danger,
-    fontSize: 13,
   },
   composer: {
     alignItems: 'flex-end',

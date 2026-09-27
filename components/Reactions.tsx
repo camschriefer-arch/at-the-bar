@@ -1,9 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { asReaction } from '../lib/emoji';
-import { REACTION_EMOJIS } from '../lib/social';
+import { EmojiPicker } from './EmojiPicker';
+import { REACTION_EMOJIS } from '../lib/emojiSet';
 import { colors, spacing } from '../lib/theme';
 import type { DrinkPostReaction } from '../lib/types';
 
@@ -18,35 +18,17 @@ type ReactionsProps = {
 
 /**
  * The reaction row: three emoji worth a single tap, whatever else people have
- * already left here, and a plus that hands the rest over to the keyboard.
+ * already left here, and a plus that opens the rest of them.
  */
 export function Reactions({ rows, onReact, onCard }: ReactionsProps) {
-  const [draft, setDraft] = useState<string | null>(null);
-  // Done both submits and blurs the box, and neither handler sees the other's
-  // state in time, so what was typed lives here as well.
-  const typed = useRef<string | null>(null);
+  const [picking, setPicking] = useState(false);
 
   const used = rows.map((row) => row.emoji).filter((emoji) => !OFFERED.includes(emoji));
   const chipStyle = [styles.chip, onCard ? styles.chipOnCard : null];
 
-  // A skin tone or the second half of a flag arrives as a keystroke of its
-  // own, so the box waits to be sent rather than reacting to the first thing
-  // that reads as an emoji.
-  const send = () => {
-    const emoji = typed.current === null ? null : asReaction(typed.current);
-    typed.current = null;
-    setDraft(null);
-    if (emoji) onReact(emoji);
-  };
-
-  const open = () => {
-    typed.current = '';
-    setDraft('');
-  };
-
-  const type = (text: string) => {
-    typed.current = text;
-    setDraft(text);
+  const pick = (emoji: string) => {
+    setPicking(false);
+    onReact(emoji);
   };
 
   return (
@@ -66,28 +48,15 @@ export function Reactions({ rows, onReact, onCard }: ReactionsProps) {
         );
       })}
 
-      {draft === null ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="React with another emoji"
-          style={chipStyle}
-          onPress={open}>
-          <Ionicons name="add" size={16} color={colors.muted} />
-        </Pressable>
-      ) : (
-        <TextInput
-          style={[chipStyle, styles.input]}
-          value={draft}
-          onChangeText={type}
-          onSubmitEditing={send}
-          onBlur={send}
-          placeholder="😀"
-          placeholderTextColor={colors.muted}
-          accessibilityLabel="Type an emoji to react with, then close the keyboard"
-          returnKeyType="done"
-          autoFocus
-        />
-      )}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="React with another emoji"
+        style={chipStyle}
+        onPress={() => setPicking(true)}>
+        <Ionicons name="add" size={16} color={colors.muted} />
+      </Pressable>
+
+      <EmojiPicker visible={picking} onPick={pick} onClose={() => setPicking(false)} />
     </View>
   );
 }
@@ -121,11 +90,5 @@ const styles = StyleSheet.create({
   count: {
     color: colors.muted,
     fontSize: 13,
-  },
-  input: {
-    color: colors.text,
-    fontSize: 16,
-    minWidth: 56,
-    paddingVertical: 2,
   },
 });

@@ -1,9 +1,6 @@
 import { supabase } from './supabase';
 import type { DrinkPostComment, DrinkPostReaction } from './types';
 
-/** Offered as taps; anything else comes off the keyboard behind the plus. */
-export const REACTION_EMOJIS = ['👍', '🔥', '🍺'] as const;
-
 export async function fetchComments(postId: string): Promise<DrinkPostComment[]> {
   const { data, error } = await supabase.rpc('drink_post_comments_for', { p_post_id: postId });
   if (error) throw error;

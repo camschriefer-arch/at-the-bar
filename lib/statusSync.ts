@@ -1,12 +1,14 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { barsNear } from './barCache';
+import { reportOnVenues, type CheckInReport } from './diagnosis';
 import { type LatLng } from './geo';
+import { isBackgroundUpdatesRunning } from './locationService';
 import { flushPendingNotifications } from './notifications';
 import { supabase } from './supabase';
 import { isMoving, type Fix } from './motion';
 import { noteSighting, parseSighting, stillAt, venuesToConfirm } from './venues';
-import { allowVenue, clearPendingVenue, promptForVenues } from './venuePrompt';
+import { allowVenue, clearPendingVenue, promptForVenues, quietVenues } from './venuePrompt';
 import type { Bar } from './types';
 
 const LAST_BAR_KEY = 'atb:lastBarId';
@@ -23,18 +25,21 @@ async function dwelledVenues(barIds: readonly string[]): Promise<string[]> {
   return dwelled;
 }
 
+/** The last fix the app was given, wherever it came from. */
+async function lastFix(): Promise<Fix | null> {
+  const raw = await AsyncStorage.getItem(FIX_KEY);
+  if (!raw) return null;
+
+  try {
+    return JSON.parse(raw) as Fix;
+  } catch {
+    return null;
+  }
+}
+
 /** Stores this fix and says whether the user got here by moving. */
 async function noteFix(fix: Fix): Promise<boolean> {
-  const raw = await AsyncStorage.getItem(FIX_KEY);
-  let previous: Fix | null = null;
-
-  if (raw) {
-    try {
-      previous = JSON.parse(raw) as Fix;
-    } catch {
-      previous = null;
-    }
-  }
+  const previous = await lastFix();
 
   await AsyncStorage.setItem(FIX_KEY, JSON.stringify(fix));
   return isMoving(previous, fix);
@@ -110,6 +115,36 @@ export async function syncStatusForLocation(
   if (asked.length > 0) await promptForVenues(asked);
 
   return { bar: null, changed: left };
+}
+
+/**
+ * What the app makes of where the user is, without changing any of it: how
+ * stale its last fix is, whether it is still being told where the phone is, and
+ * for each venue in range whether it is waiting out the dwell or has been
+ * silenced. A user sitting in a bar that never asked has no other way to see
+ * which of those happened.
+ */
+export async function diagnoseCheckIn(point: LatLng): Promise<CheckInReport> {
+  const [venues, fix, quiet, tracking, sighting] = await Promise.all([
+    barsNear(point),
+    lastFix(),
+    quietVenues(),
+    isBackgroundUpdatesRunning(),
+    AsyncStorage.getItem(SIGHTING_KEY).then(parseSighting),
+  ]);
+
+  const now = Date.now();
+  return {
+    fixAgeMs: fix ? Math.max(0, now - fix.at) : null,
+    tracking,
+    venues: reportOnVenues(point, venues, {
+      sighting,
+      prompted: quiet.prompted,
+      declined: quiet.declined,
+      fix,
+      now,
+    }),
+  };
 }
 
 /** Checks the user in at a venue they confirmed they are at. */

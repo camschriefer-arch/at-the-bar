@@ -5,6 +5,7 @@ import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-na
 import { AddVenueModal } from '../../components/AddVenueModal';
 import { Avatar } from '../../components/Avatar';
 import { Button } from '../../components/Button';
+import { CheckInReportCard } from '../../components/CheckInReportCard';
 import { CompanionModal } from '../../components/CompanionModal';
 import { DrinkGallery } from '../../components/DrinkGallery';
 import { TopBars } from '../../components/TopBars';
@@ -20,6 +21,7 @@ import {
 } from '../../lib/companions';
 import { confirmedNames, nameList, pendingNames } from '../../lib/companionText';
 import { fetchBlockedUsers, unblockUser, type BlockedUser } from '../../lib/moderation';
+import type { CheckInReport } from '../../lib/diagnosis';
 import {
   getPermissionLevel,
   getCurrentPoint,
@@ -38,7 +40,12 @@ import {
   signedDrinkUrls,
 } from '../../lib/photos';
 import { isSharingEnabled, setSharingEnabled } from '../../lib/sharing';
-import { checkInAt, clearStatus, syncStatusForLocation } from '../../lib/statusSync';
+import {
+  checkInAt,
+  clearStatus,
+  diagnoseCheckIn,
+  syncStatusForLocation,
+} from '../../lib/statusSync';
 import { colors, spacing } from '../../lib/theme';
 import type {
   Bar,
@@ -49,7 +56,12 @@ import type {
   TopBar,
   VisitCompanion,
 } from '../../lib/types';
-import { declinePendingVenue, getPendingVenue, type PendingVenue } from '../../lib/venuePrompt';
+import {
+  askAgainEverywhere,
+  declinePendingVenue,
+  getPendingVenue,
+  type PendingVenue,
+} from '../../lib/venuePrompt';
 
 export default function ProfileScreen() {
   const { session, signOut } = useAuth();
@@ -74,6 +86,7 @@ export default function ProfileScreen() {
   const [uploading, setUploading] = useState(false);
   const [addingVenue, setAddingVenue] = useState(false);
   const [nothingNearby, setNothingNearby] = useState(false);
+  const [report, setReport] = useState<CheckInReport | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -308,6 +321,36 @@ export default function ProfileScreen() {
     }
   };
 
+  /**
+   * What is holding a prompt back where the user is standing. Read only: a
+   * check that moved the dwell clock on would answer a different question from
+   * the one asked.
+   */
+  const explain = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      setReport(await diagnoseCheckIn(await getCurrentPoint()));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not check your location');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const askAgain = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await askAgainEverywhere();
+      setReport(await diagnoseCheckIn(await getCurrentPoint()));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not clear that');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const refreshStatus = async () => {
     setBusy(true);
     setError(null);
@@ -320,6 +363,7 @@ export default function ProfileScreen() {
       setBar(result.bar);
       setPending(prompt);
       setNothingNearby(!result.bar && !prompt);
+      setReport(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not check your location');
     } finally {
@@ -478,6 +522,14 @@ export default function ProfileScreen() {
               disabled={busy}
             />
           )}
+          {sharing && permission !== 'denied' && !bar ? (
+            <Button
+              title="Why was I not asked?"
+              variant="secondary"
+              onPress={() => void explain()}
+              disabled={busy}
+            />
+          ) : null}
         </View>
         {nothingNearby ? (
           <>
@@ -495,6 +547,14 @@ export default function ProfileScreen() {
           </>
         ) : null}
       </View>
+
+      {report ? (
+        <CheckInReportCard
+          report={report}
+          onAskAgain={() => void askAgain()}
+          busy={busy}
+        />
+      ) : null}
 
       <View style={styles.section}>
         <Text style={styles.label}>Frequently visited</Text>

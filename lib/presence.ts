@@ -6,8 +6,13 @@
  */
 export const STALE_STATUS_MS = 12 * 60 * 60 * 1000;
 
-export function isStaleStatus(arrivedAt: string | null, now = Date.now()): boolean {
-  if (!arrivedAt) return false;
-  const arrived = Date.parse(arrivedAt);
-  return Number.isFinite(arrived) && now - arrived > STALE_STATUS_MS;
+/**
+ * `updatedAt` is the last time the phone said anything about the status, not
+ * when the visit began, so a night that ran long is not stale while a phone
+ * that went quiet at closing time is.
+ */
+export function isStaleStatus(updatedAt: string | null, now = Date.now()): boolean {
+  if (!updatedAt) return false;
+  const updated = Date.parse(updatedAt);
+  return Number.isFinite(updated) && now - updated > STALE_STATUS_MS;
 }

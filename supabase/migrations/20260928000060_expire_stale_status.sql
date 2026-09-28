@@ -5,10 +5,14 @@
 -- task killed never notices, so the visit stands: friends open the app the next
 -- morning and someone is still at last night's bar.
 --
--- Two halves. Reads stop trusting a status older than the cutoff, so a stale
--- row is never shown even before anything has cleaned it up, and
--- expire_stale_status() clears those rows for real, closing the visit so the
--- history does not keep counting.
+-- Two halves. Reads stop trusting a status the phone has said nothing about
+-- since the cutoff, so a stale row is never shown even before anything has
+-- cleaned it up, and expire_stale_status() clears those rows for real, closing
+-- the visit so the history does not keep counting.
+--
+-- The measure is updated_at, not arrived_at: a phone still reporting refreshes
+-- its status every half hour (touchStatus in lib/statusSync.ts), so a long
+-- night out is left alone and only silence expires.
 
 create or replace function stale_status_cutoff () returns interval
 language sql
@@ -18,10 +22,9 @@ as $$
 $$;
 
 /**
- * Clears every status left standing past the cutoff and closes the visit that
- * went with it. The visit is closed at its arrival, the same as any other visit
- * whose end was never observed: we would rather record no duration than invent
- * one out of when the row happened to be swept.
+ * Clears every status the app has lost track of and closes the visit that went
+ * with it. The visit ends when the venue was last confirmed rather than when
+ * the row happened to be swept, which is the most that was ever observed.
  */
 create or replace function expire_stale_status () returns integer
 language plpgsql
@@ -37,14 +40,14 @@ begin
   perform set_config('app.expiring_status', 'on', true);
 
   with stale as (
-    select user_id, arrived_at
+    select user_id, updated_at
     from user_status
     where bar_id is not null
-      and arrived_at < now() - stale_status_cutoff()
+      and updated_at < now() - stale_status_cutoff()
   ),
   closed as (
     update check_ins c
-    set departed_at = c.arrived_at
+    set departed_at = greatest(c.arrived_at, s.updated_at)
     from stale s
     where c.user_id = s.user_id and c.departed_at is null
     returning c.user_id
@@ -153,7 +156,7 @@ as $$
   left join user_status s
     on s.user_id = p.id
     and not is_shushed(p.id, auth.uid())
-    and s.arrived_at > now() - stale_status_cutoff()
+    and s.updated_at > now() - stale_status_cutoff()
   left join bars b on b.id = s.bar_id
   where f.status = 'accepted'
     and auth.uid() in (f.requester_id, f.addressee_id)
@@ -176,7 +179,7 @@ as $$
   join profiles p on p.id = s.user_id
   where auth.uid() is not null
     and s.bar_id = p_bar_id
-    and s.arrived_at > now() - stale_status_cutoff()
+    and s.updated_at > now() - stale_status_cutoff()
     and p.id <> auth.uid()
     and are_friends(auth.uid(), p.id)
     and not is_blocked(p.id)
@@ -184,6 +187,10 @@ as $$
   order by p.display_name;
 $$;
 
+-- Postgres grants EXECUTE to public by default and Supabase grants it to anon,
+-- so both have to go before the grant that is wanted.
 revoke all on function stale_status_cutoff () from public;
+revoke all on function stale_status_cutoff () from anon;
 revoke all on function expire_stale_status () from public;
+revoke all on function expire_stale_status () from anon;
 grant execute on function expire_stale_status () to authenticated;

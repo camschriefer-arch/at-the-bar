@@ -111,7 +111,7 @@ export async function fetchMyStatus(userId: string): Promise<{ status: UserStatu
 
   // A status this old outlived the phone that set it, so it says nothing about
   // where the user is now; expire_stale_status() clears the row itself.
-  if (isStaleStatus(status.arrived_at)) {
+  if (isStaleStatus(status.updated_at)) {
     return { status: { ...(status as UserStatus), bar_id: null, arrived_at: null }, bar: null };
   }
 

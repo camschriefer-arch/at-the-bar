@@ -6,15 +6,15 @@ import { isStaleStatus, STALE_STATUS_MS } from '../lib/presence.ts';
 const now = Date.parse('2026-09-28T09:00:00Z');
 const ago = (ms: number) => new Date(now - ms).toISOString();
 
-test('nobody is anywhere without an arrival', () => {
+test('nobody is anywhere without a status', () => {
   assert.equal(isStaleStatus(null, now), false);
 });
 
-test('a visit that started this evening still counts', () => {
+test('a phone that spoke this evening is believed', () => {
   assert.equal(isStaleStatus(ago(3 * 60 * 60 * 1000), now), false);
 });
 
-test('last night stops counting the next morning', () => {
+test('a phone that went quiet last night stops being believed', () => {
   assert.equal(isStaleStatus(ago(STALE_STATUS_MS + 1000), now), true);
 });
 

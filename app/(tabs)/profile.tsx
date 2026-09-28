@@ -87,6 +87,7 @@ export default function ProfileScreen() {
   const [addingVenue, setAddingVenue] = useState(false);
   const [nothingNearby, setNothingNearby] = useState(false);
   const [report, setReport] = useState<CheckInReport | null>(null);
+  const [trouble, setTrouble] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -338,6 +339,18 @@ export default function ProfileScreen() {
     }
   };
 
+  /** Opens the trouble section, reporting straight away so it has something in it. */
+  const toggleTrouble = async () => {
+    if (trouble) {
+      setTrouble(false);
+      setReport(null);
+      return;
+    }
+
+    setTrouble(true);
+    await explain();
+  };
+
   const askAgain = async () => {
     setBusy(true);
     setError(null);
@@ -522,14 +535,6 @@ export default function ProfileScreen() {
               disabled={busy}
             />
           )}
-          {sharing && permission !== 'denied' && !bar ? (
-            <Button
-              title="Why was I not asked?"
-              variant="secondary"
-              onPress={() => void explain()}
-              disabled={busy}
-            />
-          ) : null}
         </View>
         {nothingNearby ? (
           <>
@@ -547,14 +552,6 @@ export default function ProfileScreen() {
           </>
         ) : null}
       </View>
-
-      {report ? (
-        <CheckInReportCard
-          report={report}
-          onAskAgain={() => void askAgain()}
-          busy={busy}
-        />
-      ) : null}
 
       <View style={styles.section}>
         <Text style={styles.label}>Frequently visited</Text>
@@ -622,6 +619,37 @@ export default function ProfileScreen() {
         </View>
       ) : null}
 
+      <View style={styles.section}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Having trouble?"
+          onPress={() => void toggleTrouble()}>
+          <Text style={styles.trouble}>
+            {trouble ? 'Having trouble? \u2212' : 'Having trouble? +'}
+          </Text>
+        </Pressable>
+        {trouble ? (
+          <>
+            <Text style={styles.fineprint}>
+              If you sat somewhere and were never asked about it, this says why.
+            </Text>
+            <Button
+              title={report ? 'Check again' : 'Check where I am'}
+              variant="secondary"
+              onPress={() => void explain()}
+              disabled={busy}
+            />
+            {report ? (
+              <CheckInReportCard
+                report={report}
+                onAskAgain={() => void askAgain()}
+                busy={busy}
+              />
+            ) : null}
+          </>
+        ) : null}
+      </View>
+
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
       <Button title="Sign out" variant="secondary" onPress={() => void signOut()} />
@@ -644,6 +672,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
+  },
+  trouble: {
+    color: colors.muted,
+    fontSize: 13,
+    fontWeight: '600',
   },
   unblock: {
     color: colors.accent,

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { reportOnVenues } from '../lib/diagnosis.ts';
+import { nearestVenue, reportOnVenues } from '../lib/diagnosis.ts';
 import { describeVenue, summarise } from '../lib/diagnosisText.ts';
 import { FIX_STALE_MS, type Fix } from '../lib/motion.ts';
 import { DWELL_MS } from '../lib/venues.ts';
@@ -78,7 +78,10 @@ test('says nothing is counting when the app has not heard where the phone is', (
     stale.map((venue) => venue.verdict),
     ['not-tracked', 'not-tracked']
   );
-  assert.match(summarise({ fixAgeMs: FIX_STALE_MS + 1, tracking: false, venues: stale }), /not reached/);
+  assert.match(
+    summarise({ fixAgeMs: FIX_STALE_MS + 1, tracking: false, nearest: null, venues: stale }),
+    /not reached/
+  );
 });
 
 test('sums up a block where everything has been silenced', () => {
@@ -88,10 +91,23 @@ test('sums up a block where everything has been silenced', () => {
     declined: { joe: NOW - 60_000 },
   });
 
-  assert.match(summarise({ fixAgeMs: 60_000, tracking: true, venues }), /silenced/);
+  assert.match(summarise({ fixAgeMs: 60_000, tracking: true, nearest: null, venues }), /silenced/);
 });
 
-test('sums up standing somewhere with no venue in range', () => {
+test('names how far off the nearest venue is when none is in range', () => {
   const venues = reportOnVenues(HERE, [away], state);
-  assert.match(summarise({ fixAgeMs: 60_000, tracking: true, venues }), /close enough/);
+  const nearest = nearestVenue(HERE, [away]);
+
+  assert.equal(nearest?.barName, away.name);
+  assert.match(
+    summarise({ fixAgeMs: 60_000, tracking: true, nearest, venues }),
+    /close enough.*Across Town/
+  );
+});
+
+test('says the catalog knows nowhere at all when it has no venue to name', () => {
+  assert.match(
+    summarise({ fixAgeMs: 60_000, tracking: true, nearest: null, venues: [] }),
+    /No venues here at all/
+  );
 });

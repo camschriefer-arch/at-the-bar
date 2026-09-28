@@ -33,9 +33,21 @@ export type CheckInReport = {
   tracking: boolean;
   /** Everything in range of a check-in, nearest first. */
   venues: VenueReport[];
+  /** The closest venue in the catalog, in range or not. */
+  nearest: { barName: string; meters: number } | null;
 };
 
 type Named = LatLng & { id: string; name: string };
+
+/** The closest venue the catalog knows about, however far off it is. */
+export function nearestVenue(
+  point: LatLng,
+  venues: readonly Named[]
+): { barName: string; meters: number } | null {
+  return venues
+    .map((venue) => ({ barName: venue.name, meters: distanceMeters(point, venue) }))
+    .sort((a, b) => a.meters - b.meters)[0] ?? null;
+}
 
 /**
  * Explains, for each venue in range, what the check-in logic makes of it. This

@@ -44,7 +44,9 @@ export function describeTracking(report: CheckInReport): string {
 /** The one sentence to lead with: why no prompt came. */
 export function summarise(report: CheckInReport): string {
   if (report.venues.length === 0) {
-    return 'Nowhere close enough to check into. Add the place if the catalog is missing it.';
+    return report.nearest === null
+      ? 'No venues here at all. Add the place if the catalog is missing it.'
+      : `Nowhere close enough. The nearest is ${report.nearest.barName}, ${formatDistance(report.nearest.meters)} from where your phone puts you.`;
   }
 
   if (report.venues.some((venue) => venue.verdict === 'asking')) {

@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { barsNear } from './barCache';
-import { reportOnVenues, type CheckInReport } from './diagnosis';
+import { nearestVenue, reportOnVenues, type CheckInReport } from './diagnosis';
 import { type LatLng } from './geo';
 import { isBackgroundUpdatesRunning } from './locationService';
 import { flushPendingNotifications } from './notifications';
@@ -137,6 +137,7 @@ export async function diagnoseCheckIn(point: LatLng): Promise<CheckInReport> {
   return {
     fixAgeMs: fix ? Math.max(0, now - fix.at) : null,
     tracking,
+    nearest: nearestVenue(point, venues),
     venues: reportOnVenues(point, venues, {
       sighting,
       prompted: quiet.prompted,

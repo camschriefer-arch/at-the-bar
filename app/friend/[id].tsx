@@ -1,4 +1,4 @@
-import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
@@ -14,6 +14,7 @@ import { untilLabel } from '../../lib/shushTime';
 import { fetchDrinkPosts, signedAvatarUrl, signedDrinkUrls } from '../../lib/photos';
 import { colors, spacing } from '../../lib/theme';
 import type { DrinkPost, FriendFeedRow, TopBar } from '../../lib/types';
+import { useReload } from '../../lib/useReload';
 
 const MAP_SPAN_DEGREES = 0.01;
 
@@ -70,11 +71,7 @@ export default function FriendScreen() {
     }
   }, [id]);
 
-  useFocusEffect(
-    useCallback(() => {
-      void load();
-    }, [load])
-  );
+  useReload(load);
 
   const remove = async (name: string) => {
     setRemoving(true);

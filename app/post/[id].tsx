@@ -1,5 +1,5 @@
 import { Image } from "expo-image";
-import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import {
   Alert,
@@ -20,6 +20,7 @@ import { blockUser } from "../../lib/moderation";
 import { signedAvatarUrl, signedDrinkUrlsFor } from "../../lib/photos";
 import { colors, spacing } from "../../lib/theme";
 import type { FeedItem } from "../../lib/types";
+import { useReload } from "../../lib/useReload";
 
 const postedOn = (iso: string) =>
   new Date(iso).toLocaleString(undefined, {
@@ -61,11 +62,7 @@ export default function PostScreen() {
     }
   }, [id]);
 
-  useFocusEffect(
-    useCallback(() => {
-      void load();
-    }, [load]),
-  );
+  useReload(load);
 
   /**
    * Puts the photo on your own feed for your friends. The thread underneath is

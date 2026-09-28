@@ -1,4 +1,4 @@
-import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
@@ -13,6 +13,7 @@ import {
 import { signedAvatarUrl } from '../../lib/photos';
 import { colors, spacing } from '../../lib/theme';
 import type { PublicProfile } from '../../lib/types';
+import { useReload } from '../../lib/useReload';
 
 /**
  * Someone you are not friends with, reached from a comment on a photo. Their
@@ -46,11 +47,7 @@ export default function PublicProfileScreen() {
     }
   }, [id]);
 
-  useFocusEffect(
-    useCallback(() => {
-      void load();
-    }, [load])
-  );
+  useReload(load);
 
   const run = async (action: () => Promise<void>, failure: string) => {
     setBusy(true);

@@ -1,4 +1,4 @@
-import { useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -62,12 +62,13 @@ import {
   getPendingVenue,
   type PendingVenue,
 } from '../../lib/venuePrompt';
+import { useReload } from '../../lib/useReload';
 
 export default function ProfileScreen() {
   const { session, signOut } = useAuth();
   const userId = session?.user.id;
   // A comment or reaction push opens the photo it was left on.
-  const { post } = useLocalSearchParams<{ post?: string }>();
+  const { post, ask } = useLocalSearchParams<{ post?: string; ask?: string }>();
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [bar, setBar] = useState<Bar | null>(null);
@@ -136,11 +137,9 @@ export default function ProfileScreen() {
     }
   }, [loadCompanions, userId]);
 
-  useFocusEffect(
-    useCallback(() => {
-      void load();
-    }, [load])
-  );
+  // A tapped notification lands here carrying its own identifier, so the
+  // prompt it was about is read even when the You tab was already in front.
+  useReload(load, ask);
 
   const enableSharing = async () => {
     setBusy(true);

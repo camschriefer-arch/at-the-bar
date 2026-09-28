@@ -1,4 +1,4 @@
-import { useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -62,12 +62,13 @@ import {
   getPendingVenue,
   type PendingVenue,
 } from '../../lib/venuePrompt';
+import { useReload } from '../../lib/useReload';
 
 export default function ProfileScreen() {
   const { session, signOut } = useAuth();
   const userId = session?.user.id;
   // A comment or reaction push opens the photo it was left on.
-  const { post } = useLocalSearchParams<{ post?: string }>();
+  const { post, ask } = useLocalSearchParams<{ post?: string; ask?: string }>();
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [bar, setBar] = useState<Bar | null>(null);
@@ -87,6 +88,7 @@ export default function ProfileScreen() {
   const [addingVenue, setAddingVenue] = useState(false);
   const [nothingNearby, setNothingNearby] = useState(false);
   const [report, setReport] = useState<CheckInReport | null>(null);
+  const [trouble, setTrouble] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -135,11 +137,9 @@ export default function ProfileScreen() {
     }
   }, [loadCompanions, userId]);
 
-  useFocusEffect(
-    useCallback(() => {
-      void load();
-    }, [load])
-  );
+  // A tapped notification lands here carrying its own identifier, so the
+  // prompt it was about is read even when the You tab was already in front.
+  useReload(load, ask);
 
   const enableSharing = async () => {
     setBusy(true);
@@ -338,6 +338,18 @@ export default function ProfileScreen() {
     }
   };
 
+  /** Opens the trouble section, reporting straight away so it has something in it. */
+  const toggleTrouble = async () => {
+    if (trouble) {
+      setTrouble(false);
+      setReport(null);
+      return;
+    }
+
+    setTrouble(true);
+    await explain();
+  };
+
   const askAgain = async () => {
     setBusy(true);
     setError(null);
@@ -522,14 +534,6 @@ export default function ProfileScreen() {
               disabled={busy}
             />
           )}
-          {sharing && permission !== 'denied' && !bar ? (
-            <Button
-              title="Why was I not asked?"
-              variant="secondary"
-              onPress={() => void explain()}
-              disabled={busy}
-            />
-          ) : null}
         </View>
         {nothingNearby ? (
           <>
@@ -547,14 +551,6 @@ export default function ProfileScreen() {
           </>
         ) : null}
       </View>
-
-      {report ? (
-        <CheckInReportCard
-          report={report}
-          onAskAgain={() => void askAgain()}
-          busy={busy}
-        />
-      ) : null}
 
       <View style={styles.section}>
         <Text style={styles.label}>Frequently visited</Text>
@@ -622,6 +618,37 @@ export default function ProfileScreen() {
         </View>
       ) : null}
 
+      <View style={styles.section}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Having trouble?"
+          onPress={() => void toggleTrouble()}>
+          <Text style={styles.trouble}>
+            {trouble ? 'Having trouble? \u2212' : 'Having trouble? +'}
+          </Text>
+        </Pressable>
+        {trouble ? (
+          <>
+            <Text style={styles.fineprint}>
+              If you sat somewhere and were never asked about it, this says why.
+            </Text>
+            <Button
+              title={report ? 'Check again' : 'Check where I am'}
+              variant="secondary"
+              onPress={() => void explain()}
+              disabled={busy}
+            />
+            {report ? (
+              <CheckInReportCard
+                report={report}
+                onAskAgain={() => void askAgain()}
+                busy={busy}
+              />
+            ) : null}
+          </>
+        ) : null}
+      </View>
+
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
       <Button title="Sign out" variant="secondary" onPress={() => void signOut()} />
@@ -644,6 +671,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
+  },
+  trouble: {
+    color: colors.muted,
+    fontSize: 13,
+    fontWeight: '600',
   },
   unblock: {
     color: colors.accent,

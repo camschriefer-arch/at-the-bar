@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { barsNear } from './barCache';
-import { reportOnVenues, type CheckInReport } from './diagnosis';
+import { nearestVenue, reportOnVenues, type CheckInReport } from './diagnosis';
 import { type LatLng } from './geo';
 import { isBackgroundUpdatesRunning } from './locationService';
 import { flushPendingNotifications } from './notifications';
@@ -14,6 +14,15 @@ import type { Bar } from './types';
 const LAST_BAR_KEY = 'atb:lastBarId';
 const SIGHTING_KEY = 'atb:sighting';
 const FIX_KEY = 'atb:lastFix';
+const TOUCH_KEY = 'atb:statusTouched';
+
+/**
+ * How often a status that has not changed is written again anyway. The server
+ * expires a status it has heard nothing about (stale_status_cutoff()), so
+ * saying "still here" keeps a real night out from being swept out from under
+ * the user, and restores a status that was swept while the phone was asleep.
+ */
+const TOUCH_MS = 30 * 60 * 1000;
 
 export type ResolvedStatus = { bar: Bar | null; changed: boolean };
 
@@ -52,7 +61,20 @@ async function writeStatus(barId: string | null): Promise<void> {
   if (barId) await AsyncStorage.setItem(LAST_BAR_KEY, barId);
   else await AsyncStorage.removeItem(LAST_BAR_KEY);
 
+  await AsyncStorage.setItem(TOUCH_KEY, String(Date.now()));
   await flushPendingNotifications();
+}
+
+/**
+ * Tells the server the user is still where it was last told, every `TOUCH_MS`.
+ * set_current_bar() leaves an unchanged bar's arrival and open visit alone, so
+ * this costs a timestamp and announces nothing.
+ */
+async function touchStatus(barId: string): Promise<void> {
+  const last = Number(await AsyncStorage.getItem(TOUCH_KEY));
+  if (Number.isFinite(last) && Date.now() - last < TOUCH_MS) return;
+
+  await writeStatus(barId);
 }
 
 /**
@@ -82,6 +104,7 @@ export async function syncStatusForLocation(
 
   if (current) {
     await AsyncStorage.removeItem(SIGHTING_KEY);
+    await touchStatus(current.id);
     return { bar: current, changed: false };
   }
 
@@ -137,6 +160,7 @@ export async function diagnoseCheckIn(point: LatLng): Promise<CheckInReport> {
   return {
     fixAgeMs: fix ? Math.max(0, now - fix.at) : null,
     tracking,
+    nearest: nearestVenue(point, venues),
     venues: reportOnVenues(point, venues, {
       sighting,
       prompted: quiet.prompted,
@@ -155,7 +179,7 @@ export async function checkInAt(barId: string): Promise<void> {
 }
 
 export async function clearStatus(): Promise<void> {
-  await AsyncStorage.multiRemove([LAST_BAR_KEY, SIGHTING_KEY, FIX_KEY]);
+  await AsyncStorage.multiRemove([LAST_BAR_KEY, SIGHTING_KEY, FIX_KEY, TOUCH_KEY]);
   await supabase.rpc('set_current_bar', { p_bar_id: null });
   await clearPendingVenue();
   await flushPendingNotifications();

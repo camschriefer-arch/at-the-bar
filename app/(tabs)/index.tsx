@@ -1,4 +1,4 @@
-import { useFocusEffect, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
@@ -26,6 +26,7 @@ import { blockUser } from "../../lib/moderation";
 import { signedAvatarUrlsFor, signedDrinkUrlsFor } from "../../lib/photos";
 import { colors, spacing } from "../../lib/theme";
 import type { FeedItem } from "../../lib/types";
+import { useReload } from "../../lib/useReload";
 
 export default function FeedScreen() {
   const { session } = useAuth();
@@ -73,11 +74,7 @@ export default function FeedScreen() {
     }
   }, [sign, userId]);
 
-  useFocusEffect(
-    useCallback(() => {
-      void load();
-    }, [load]),
-  );
+  useReload(load);
 
   const refresh = async () => {
     setRefreshing(true);

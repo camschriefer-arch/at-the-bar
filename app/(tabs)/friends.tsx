@@ -1,4 +1,4 @@
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -23,6 +23,7 @@ import {
 import { untilLabel } from '../../lib/shushTime';
 import { colors, spacing } from '../../lib/theme';
 import type { FriendFeedRow, FriendGroup, Profile } from '../../lib/types';
+import { useReload } from '../../lib/useReload';
 
 const REFRESH_INTERVAL_MS = 30_000;
 
@@ -75,11 +76,7 @@ export default function FriendsScreen() {
     }
   }, [userId]);
 
-  useFocusEffect(
-    useCallback(() => {
-      void load();
-    }, [load])
-  );
+  useReload(load);
 
   useEffect(() => {
     const timer = setInterval(() => void load(), REFRESH_INTERVAL_MS);

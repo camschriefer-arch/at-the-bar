@@ -1,4 +1,5 @@
 import { flushPendingNotifications } from './notifications';
+import { isStaleStatus } from './presence';
 import { supabase } from './supabase';
 import type {
   Bar,
@@ -107,7 +108,24 @@ export async function fetchMyStatus(userId: string): Promise<{ status: UserStatu
 
   const { bar, ...status } = data;
   const resolved = (Array.isArray(bar) ? bar[0] : bar) as Bar | undefined;
+
+  // A status this old outlived the phone that set it, so it says nothing about
+  // where the user is now; expire_stale_status() clears the row itself.
+  if (isStaleStatus(status.updated_at)) {
+    return { status: { ...(status as UserStatus), bar_id: null, arrived_at: null }, bar: null };
+  }
+
   return { status: status as UserStatus, bar: resolved ?? null };
+}
+
+/**
+ * Ends every visit left standing past the cutoff, anyone's. A phone that never
+ * woke up to notice it had left cannot clear its own status, so whichever
+ * client opens next does it for them.
+ */
+export async function expireStaleStatus(): Promise<void> {
+  const { error } = await supabase.rpc('expire_stale_status');
+  if (error) throw error;
 }
 
 export async function fetchTopBars(userId: string, limit = 5): Promise<TopBar[]> {

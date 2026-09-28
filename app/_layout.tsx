@@ -5,6 +5,7 @@ import { useEffect, useRef } from 'react';
 import { ActivityIndicator, AppState, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { expireStaleStatus } from '../lib/api';
 import { AuthProvider, useAuth } from '../lib/AuthProvider';
 import { getPermissionLevel, resumeBackgroundUpdates } from '../lib/locationService';
 import { registerForPushNotifications } from '../lib/notifications';
@@ -54,6 +55,9 @@ function RootNavigator() {
       // Nothing here is worth an error to the user: the tracking either
       // restarts or the next launch tries again.
       void resumeBackgroundUpdates().catch(() => undefined);
+      // Somebody has to end the visits whose own phone never woke up to end
+      // them, and whoever opens the app next is the one who can.
+      void expireStaleStatus().catch(() => undefined);
     };
 
     resume();
@@ -133,7 +137,7 @@ function RootNavigator() {
     }
     if (event === 'tagged') {
       // Being named waits on a yes, and the You tab is where it is answered.
-      router.push('/(tabs)/profile');
+      router.navigate(`/(tabs)/profile?ask=${identifier}`);
       return;
     }
     if (friendId) {
@@ -150,8 +154,11 @@ function RootNavigator() {
     } else if (tapped.actionIdentifier === VENUE_PROMPT_CONFIRM && barId) {
       void checkInAt(barId);
     } else {
-      // Tapping the notification itself opens the screen that asks again.
-      router.push('/(tabs)/profile');
+      // Tapping the notification itself opens the screen that asks again. The
+      // tap carries its own identifier because the You tab is often already the
+      // screen in front — navigating to where you already are changes nothing,
+      // and the prompt would sit unread behind a profile that never reloaded.
+      router.navigate(`/(tabs)/profile?ask=${identifier}`);
     }
   }, [session, tapped, router]);
 

@@ -30,7 +30,7 @@ Your coordinates never leave your device. The app downloads the venues for a coa
 | Location | `expo-location` foreground + background updates, `expo-task-manager` |
 | Maps | `react-native-maps` with Google Maps on both platforms |
 | Backend | Supabase: Postgres + PostGIS, auth, row level security |
-| Venue catalog | [Overture Maps](https://overturemaps.org) places, imported nationwide with DuckDB |
+| Venue catalog | [Overture Maps](https://overturemaps.org) places, imported per country with DuckDB |
 | Push | `expo-notifications` + Expo Push Service, fanned out by the `send-push` edge function |
 | Photos | `expo-image-picker` + private Supabase Storage buckets, rendered from signed URLs with `expo-image` |
 
@@ -58,9 +58,10 @@ Your coordinates never leave your device. The app downloads the venues for a coa
    pip install duckdb
    SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... python3 scripts/import_places.py --states MA,NY
    SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... python3 scripts/import_places.py   # 50 states + DC
+   SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... python3 scripts/import_places.py --country ES
    ```
 
-   Venues come from the newest [Overture Maps](https://overturemaps.org) release, queried straight off S3 as GeoParquet — about 350k US bars, pubs and restaurants. The import is idempotent (keyed on `source, source_id`), so re-running it only refreshes rows. A full run also calls `prune_unused_osm_bars()` to drop the OpenStreetMap rows Overture replaced, keeping any that a check-in or a drink photo still points at; pass `--keep-osm` to skip that.
+   Venues come from the newest [Overture Maps](https://overturemaps.org) release, queried straight off S3 as GeoParquet — about 350k US bars, pubs and restaurants, plus Spain. `--country` takes any ISO code Overture addresses carry; only the US is split into regions, so `--states` applies to it alone. The import is idempotent (keyed on `source, source_id`), so re-running it only refreshes rows. A full run also calls `prune_unused_osm_bars()` to drop the OpenStreetMap rows Overture replaced, keeping any that a check-in or a drink photo still points at; pass `--keep-osm` to skip that.
 
    A venue someone adds from the app carries its own address, geocoded on the phone as it is saved. Venues added before that shipped have coordinates but no address; fill them in once with:
 
@@ -71,7 +72,7 @@ Your coordinates never leave your device. The app downloads the venues for a coa
 
    It asks [Nominatim](https://nominatim.org) what is at each venue's coordinates, one venue a second, and only writes fields that are still empty, so it is safe to re-run and it never overwrites an address that is already there.
 
-   Production keeps itself current: [`.github/workflows/refresh-venues.yml`](.github/workflows/refresh-venues.yml) re-imports the country at 04:00 UTC on the 1st of each month. It needs the repository secrets `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, and can be run by hand (optionally for a few states) from the Actions tab.
+   Production keeps itself current: [`.github/workflows/refresh-venues.yml`](.github/workflows/refresh-venues.yml) re-imports every country the app covers at 04:00 UTC on the 1st of each month. It needs the repository secrets `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, and can be run by hand (optionally for a few states, or one country) from the Actions tab.
 
 4. Run it. Background location needs a development build, not Expo Go:
 

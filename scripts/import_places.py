@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
-"""Imports the US venue catalog from Overture Maps into the `bars` table.
+"""Imports a country's venue catalog from Overture Maps into the `bars` table.
 
-Overture publishes its places theme as GeoParquet on S3, so the whole country is
-one DuckDB query with no per-state throttling. Reruns are idempotent: rows are
+Overture publishes its places theme as GeoParquet on S3, so a whole country is
+one DuckDB query with no per-region throttling. Reruns are idempotent: rows are
 keyed on (source, source_id).
 
 Usage:
   SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... python3 scripts/import_places.py
   python3 scripts/import_places.py --states MA,NY   # subset, useful for a first run
+  python3 scripts/import_places.py --country ES     # every venue in Spain
   python3 scripts/import_places.py --keep-osm       # leave the old OSM rows in place
 
-Needs `pip install duckdb`.
+Needs `pip install duckdb`, and an Overture release from 2026-09 onwards, where the
+category of a place lives in `taxonomy` rather than the older `categories`.
 """
 
 from __future__ import annotations
@@ -89,8 +91,11 @@ def latest_release() -> str:
     return sorted(releases)[-1]
 
 
-def rows_for(release: str, states: list[str]):
-    """Streams the venues of the given states, already mapped to `bars` rows."""
+def rows_for(release: str, country: str, states: list[str] | None):
+    """Streams a country's venues, already mapped to `bars` rows.
+
+    `states` narrows the import to those regions; None takes the whole country.
+    """
     import duckdb
 
     connection = duckdb.connect()
@@ -99,9 +104,13 @@ def rows_for(release: str, states: list[str]):
     # The category filter runs in SQL only as a coarse sieve; `category_for`
     # makes the real decision, so a new Overture category cannot silently import
     # a barber shop as a bar.
-    # Both lists are the script's own constants, checked against `STATES` before
-    # they get here.
-    state_list = ", ".join(f"'{code}'" for code in states)
+    # The lists are the script's own constants, and the country and region codes
+    # are checked before they get here.
+    region_filter = ""
+    if states is not None:
+        state_list = ", ".join(f"'{code}'" for code in states)
+        region_filter = f"and addresses[1].region in ({state_list})"
+
     category_list = ", ".join(
         f"'{name}'" for name in sorted(PUB_CATEGORIES | BAR_CATEGORIES | RESTAURANT_CATEGORIES)
     )
@@ -111,7 +120,7 @@ def rows_for(release: str, states: list[str]):
         select
           id,
           names.primary as name,
-          categories.primary as category,
+          taxonomy.primary as category,
           bbox.ymin as lat,
           bbox.xmin as lng,
           addresses[1].freeform as street,
@@ -121,12 +130,12 @@ def rows_for(release: str, states: list[str]):
         from read_parquet(
           's3://{BUCKET}/release/{release}/theme=places/type=place/*'
         )
-        where addresses[1].country = 'US'
-          and addresses[1].region in ({state_list})
+        where addresses[1].country = '{country}'
+          {region_filter}
           and names.primary is not null
           and (
-            regexp_matches(categories.primary, '_(bar|restaurant)$')
-            or categories.primary in ({category_list})
+            regexp_matches(taxonomy.primary, '_(bar|restaurant)$')
+            or taxonomy.primary in ({category_list})
           )
         -- Overture carries the odd duplicate of the same venue: City Works in
         -- Watertown is in there twice, 2 m apart. Keep whichever Overture is
@@ -202,7 +211,12 @@ def post(url: str, key: str, body: object, prefer: str) -> str:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--states", help="comma separated state codes, e.g. MA,NY")
+    parser.add_argument("--states", help="comma separated US state codes, e.g. MA,NY")
+    parser.add_argument(
+        "--country",
+        default="US",
+        help="ISO country code to import, e.g. ES (default: US)",
+    )
     parser.add_argument("--release", help="Overture release, e.g. 2026-08-19.0")
     parser.add_argument(
         "--keep-osm",
@@ -216,31 +230,41 @@ def main() -> None:
     if not url or not key:
         raise SystemExit("Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY before importing.")
 
-    states = STATES
+    country = arguments.country.strip().upper()
+    if not re.fullmatch(r"[A-Z]{2}", country):
+        raise SystemExit(f"Expected a two letter country code, got {arguments.country!r}.")
+
+    # Only the US catalog is imported region by region; elsewhere the whole
+    # country is one query, so there is no list of region codes to check against.
+    states: list[str] | None = STATES if country == "US" else None
     if arguments.states:
+        if country != "US":
+            raise SystemExit("--states only applies to --country US.")
         states = [code.strip().upper() for code in arguments.states.split(",")]
         unknown = [code for code in states if code not in STATES]
         if unknown:
             raise SystemExit(f"Unknown state codes: {', '.join(unknown)}")
 
     release = arguments.release or latest_release()
-    print(f"Overture release {release}, {len(states)} states")
+    scope = f"{len(states)} states" if states is not None else "all regions"
+    print(f"Overture release {release}, {country}, {scope}")
 
     upsert_url = f"{url.rstrip('/')}/rest/v1/bars?on_conflict=source,source_id"
     total = 0
 
-    for rows in rows_for(release, states):
+    for rows in rows_for(release, country, states):
         post(upsert_url, key, rows, "resolution=merge-duplicates,return=minimal")
         total += len(rows)
         print(f"\r{total} venues", end="", flush=True)
 
     print()
 
-    # A partial run has no business deleting the OSM rows for states it skipped.
     if total == 0:
         raise SystemExit("Overture returned nothing; refusing to touch the catalog.")
 
-    if arguments.keep_osm or states != STATES:
+    # The OSM rows being replaced are all American, so only a full US run has any
+    # business deleting them.
+    if arguments.keep_osm or country != "US" or states != STATES:
         print(f"Imported {total} venues, left the OSM rows alone.")
         return
 

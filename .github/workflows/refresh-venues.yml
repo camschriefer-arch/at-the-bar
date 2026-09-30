@@ -10,7 +10,11 @@ on:
   workflow_dispatch:
     inputs:
       states:
-        description: 'Comma separated states to refresh (default: all)'
+        description: 'Comma separated US states to refresh (default: all)'
+        required: false
+        type: string
+      country:
+        description: 'ISO country code to refresh, e.g. ES (default: US)'
         required: false
         type: string
 
@@ -33,9 +37,16 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           STATES: ${{ inputs.states }}
+          COUNTRY: ${{ inputs.country }}
         run: |
+          set -e
           if [ -n "$STATES" ]; then
             python3 scripts/import_places.py --states "$STATES"
+          elif [ -n "$COUNTRY" ]; then
+            python3 scripts/import_places.py --country "$COUNTRY"
           else
-            python3 scripts/import_places.py
+            # The scheduled run refreshes every country the app covers.
+            for country in US ES; do
+              python3 scripts/import_places.py --country "$country"
+            done
           fi

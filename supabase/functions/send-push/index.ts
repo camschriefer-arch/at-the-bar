@@ -33,7 +33,12 @@ type OutboxRow = {
   token: string;
   post_id: string | null;
   image_path: string | null;
+  visit_id: string | null;
 };
+
+// The buttons the app registered under this name; being named is the one event
+// that asks a question, so it is the one that carries them.
+const COMPANION_PROMPT_CATEGORY = 'companion.confirm';
 
 type ExpoTicket = {
   status: 'ok' | 'error';
@@ -88,9 +93,17 @@ Deno.serve(async (request: Request) => {
       channelId: 'bar-events',
       priority: 'high',
       ...(image ? { richContent: { image }, mutableContent: true } : {}),
+      ...(row.event === 'tagged' && row.visit_id
+        ? { categoryId: COMPANION_PROMPT_CATEGORY }
+        : {}),
       // The tap handler opens the friend, who is only rendered if the viewer is
       // still allowed to see them, so the payload carries no bar of its own.
-      data: { friendId: row.actor_id, event: row.event, postId: row.post_id ?? undefined },
+      data: {
+        friendId: row.actor_id,
+        event: row.event,
+        postId: row.post_id ?? undefined,
+        visitId: row.visit_id ?? undefined,
+      },
     };
   });
 

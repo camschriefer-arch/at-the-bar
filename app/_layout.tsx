@@ -7,8 +7,13 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { expireStaleStatus } from '../lib/api';
 import { AuthProvider, useAuth } from '../lib/AuthProvider';
+import { respondToCompanionTag } from '../lib/companions';
 import { getPermissionLevel, resumeBackgroundUpdates } from '../lib/locationService';
-import { registerForPushNotifications } from '../lib/notifications';
+import {
+  COMPANION_PROMPT_CONFIRM,
+  COMPANION_PROMPT_DECLINE,
+  registerForPushNotifications,
+} from '../lib/notifications';
 import { clearLocationReminderSnooze, isLocationReminderSnoozed } from '../lib/onboarding';
 import { checkInAt } from '../lib/statusSync';
 import { colors } from '../lib/theme';
@@ -24,6 +29,7 @@ type BarEventPayload = {
   barId?: string;
   postId?: string;
   event?: string;
+  visitId?: string;
 };
 
 function RootNavigator() {
@@ -121,7 +127,7 @@ function RootNavigator() {
     handledTap.current = identifier;
     void Notifications.clearLastNotificationResponseAsync();
 
-    const { friendId, kind, barId, postId, event } = tapped.notification.request.content
+    const { friendId, kind, barId, postId, event, visitId } = tapped.notification.request.content
       .data as BarEventPayload;
     if (friendId && event === 'requested') {
       // Not friends yet, so only the limited profile — where the request can be
@@ -136,7 +142,18 @@ function RootNavigator() {
       return;
     }
     if (event === 'tagged') {
-      // Being named waits on a yes, and the You tab is where it is answered.
+      // Answered from the notification's own buttons there is nothing to open:
+      // a no is the whole answer, and a yes only has to reach the server, which
+      // the card on the You tab would otherwise have done.
+      if (visitId && tapped.actionIdentifier === COMPANION_PROMPT_DECLINE) {
+        void respondToCompanionTag(visitId, false).catch(() => undefined);
+        return;
+      }
+      if (visitId && tapped.actionIdentifier === COMPANION_PROMPT_CONFIRM) {
+        void respondToCompanionTag(visitId, true).catch(() => undefined);
+      }
+      // Being named waits on a yes, and the You tab is where it is answered —
+      // and where an answer that failed to reach the server still stands.
       router.navigate(`/(tabs)/profile?ask=${identifier}`);
       return;
     }

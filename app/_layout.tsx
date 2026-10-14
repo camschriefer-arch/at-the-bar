@@ -5,6 +5,7 @@ import { useEffect, useRef } from 'react';
 import { ActivityIndicator, AppState, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { logEvent } from '../lib/analytics';
 import { expireStaleStatus } from '../lib/api';
 import { AuthProvider, useAuth } from '../lib/AuthProvider';
 import { getPermissionLevel, resumeBackgroundUpdates } from '../lib/locationService';
@@ -123,6 +124,12 @@ function RootNavigator() {
 
     const { friendId, kind, barId, postId, event } = tapped.notification.request.content
       .data as BarEventPayload;
+    // Whether anyone opens a push at all, and which kind they open, is the
+    // thing the outbox cannot say: it only knows what was sent.
+    void logEvent('notification_opened', {
+      barId: barId ?? null,
+      source: event ?? kind ?? null,
+    });
     if (friendId && event === 'requested') {
       // Not friends yet, so only the limited profile — where the request can be
       // accepted — is open to them.
@@ -150,9 +157,9 @@ function RootNavigator() {
     if (kind !== 'venue-confirm' && kind !== 'venue-choose') return;
 
     if (tapped.actionIdentifier === VENUE_PROMPT_DISMISS) {
-      void declinePendingVenue();
+      void declinePendingVenue('notification');
     } else if (tapped.actionIdentifier === VENUE_PROMPT_CONFIRM && barId) {
-      void checkInAt(barId);
+      void checkInAt(barId, 'notification');
     } else {
       // Tapping the notification itself opens the screen that asks again. The
       // tap carries its own identifier because the You tab is often already the

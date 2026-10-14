@@ -1,14 +1,21 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { logEvent } from './analytics';
 import { barsNear } from './barCache';
 import { nearestVenue, reportOnVenues, type CheckInReport } from './diagnosis';
-import { type LatLng } from './geo';
+import { distanceMeters, type LatLng } from './geo';
 import { isBackgroundUpdatesRunning } from './locationService';
 import { flushPendingNotifications } from './notifications';
 import { supabase } from './supabase';
 import { isMoving, type Fix } from './motion';
-import { noteSighting, parseSighting, stillAt, venuesToConfirm } from './venues';
-import { allowVenue, clearPendingVenue, promptForVenues, quietVenues } from './venuePrompt';
+import { noteSighting, parseSighting, stillAt, venuesToConfirm, type Sighting } from './venues';
+import {
+  allowVenue,
+  clearPendingVenue,
+  getPendingVenue,
+  promptForVenues,
+  quietVenues,
+} from './venuePrompt';
 import type { Bar } from './types';
 
 const LAST_BAR_KEY = 'atb:lastBarId';
@@ -27,11 +34,38 @@ const TOUCH_MS = 30 * 60 * 1000;
 export type ResolvedStatus = { bar: Bar | null; changed: boolean };
 
 /** Which of `barIds` the user has been near long enough for them to count. */
-async function dwelledVenues(barIds: readonly string[]): Promise<string[]> {
+async function dwelledVenues(
+  barIds: readonly string[]
+): Promise<{ dwelled: string[]; sighting: Sighting }> {
   const previous = parseSighting(await AsyncStorage.getItem(SIGHTING_KEY));
   const { sighting, dwelled } = noteSighting(previous, barIds, Date.now());
   await AsyncStorage.setItem(SIGHTING_KEY, JSON.stringify(sighting));
-  return dwelled;
+  return { dwelled, sighting };
+}
+
+/**
+ * Records that the app asked, and what it knew when it did: the venue, how far
+ * off the user was and how long it had been watching them sit there. Those are
+ * the numbers behind the dwell and the radius, and until they are written down
+ * every change to either is a guess.
+ */
+function notePrompt(
+  point: LatLng,
+  asked: readonly Bar[],
+  source: string,
+  sighting: Sighting | null
+): void {
+  if (asked.length === 0) return;
+
+  const nearest = asked[0];
+  const seen = sighting?.[nearest.id];
+  void logEvent('prompt_shown', {
+    barId: asked.length === 1 ? nearest.id : null,
+    source,
+    venueCount: asked.length,
+    meters: distanceMeters(point, nearest),
+    dwelledMs: seen ? Math.max(0, Date.now() - seen.since) : null,
+  });
 }
 
 /** The last fix the app was given, wherever it came from. */
@@ -118,6 +152,12 @@ export async function syncStatusForLocation(
   const candidates = venuesToConfirm(point, venues);
   if (candidates.length === 0) {
     await AsyncStorage.removeItem(SIGHTING_KEY);
+    if (immediate) {
+      // Asked by hand and answered with nothing. How far the nearest venue was
+      // is the whole question when someone is certain they were at one.
+      const nearest = nearestVenue(point, venues);
+      void logEvent('check_in_found_nothing', { meters: nearest?.meters ?? null });
+    }
     return { bar: null, changed: left };
   }
 
@@ -129,13 +169,14 @@ export async function syncStatusForLocation(
   }
 
   if (immediate) {
-    await promptForVenues(candidates, { force: true });
+    const asked = await promptForVenues(candidates, { force: true });
+    notePrompt(point, asked, 'manual', parseSighting(await AsyncStorage.getItem(SIGHTING_KEY)));
     return { bar: null, changed: left };
   }
 
-  const dwelled = await dwelledVenues(candidates.map((venue) => venue.id));
-  const asked = candidates.filter((venue) => dwelled.includes(venue.id));
-  if (asked.length > 0) await promptForVenues(asked);
+  const { dwelled, sighting } = await dwelledVenues(candidates.map((venue) => venue.id));
+  const ready = candidates.filter((venue) => dwelled.includes(venue.id));
+  if (ready.length > 0) notePrompt(point, await promptForVenues(ready), 'auto', sighting);
 
   return { bar: null, changed: left };
 }
@@ -171,11 +212,25 @@ export async function diagnoseCheckIn(point: LatLng): Promise<CheckInReport> {
   };
 }
 
-/** Checks the user in at a venue they confirmed they are at. */
-export async function checkInAt(barId: string): Promise<void> {
+/**
+ * Checks the user in at a venue they confirmed they are at. `source` is what
+ * they confirmed it from — a notification button, the picker in the app, a
+ * venue they added, or Join — which is the only way to tell whether the
+ * buttons on a notification are worth having.
+ */
+export async function checkInAt(barId: string, source: string): Promise<void> {
+  const pending = await getPendingVenue();
+
   await writeStatus(barId);
   await allowVenue(barId);
   await clearPendingVenue();
+
+  void logEvent('check_in', {
+    barId,
+    source,
+    venueCount: pending?.choices.length ?? null,
+    answeredInMs: pending ? Date.now() - pending.promptedAt : null,
+  });
 }
 
 export async function clearStatus(): Promise<void> {

@@ -230,7 +230,7 @@ export default function ProfileScreen() {
     setBusy(true);
     setError(null);
     try {
-      await checkInAt(barId);
+      await checkInAt(barId, 'picker');
       setPending(null);
       await load();
       await offerCompanions();
@@ -255,7 +255,7 @@ export default function ProfileScreen() {
     setBusy(true);
     setError(null);
     try {
-      await checkInAt(added.id);
+      await checkInAt(added.id, 'added');
       setPending(null);
       setNothingNearby(false);
       await load();

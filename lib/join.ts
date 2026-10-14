@@ -33,7 +33,7 @@ export async function checkInToJoin(barId: string): Promise<CurrentVisit> {
     throw new Error('You are not close enough to that bar to check in.');
   }
 
-  await checkInAt(barId);
+  await checkInAt(barId, 'join');
   const visit = await currentVisit();
   if (!visit) throw new Error('Could not check you in there.');
   return visit;

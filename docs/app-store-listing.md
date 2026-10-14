@@ -82,8 +82,17 @@ The first release of At The Bar. Find your friends when they're out, and let the
 | Photos | Yes | Yes | No | App Functionality |
 | User Content (drink notes/ratings) | Yes | Yes | No | App Functionality |
 | Identifiers (push token) | Yes | Yes | No | App Functionality |
+| Product Interaction | Yes | Yes | No | Analytics, App Functionality |
 
-Nothing is used for advertising, analytics or tracking.
+Nothing is used for advertising or tracking, and no third-party analytics or
+advertising SDK is present.
+
+Note on Product Interaction: the app records its own prompts and what the user
+answered — that it asked about a named venue, how long that venue had been
+nearby, roughly how far away the user was (rounded to 10 m), the answer and how
+long it took, and whether a notification was opened. This is how the dwell time
+and the check-in radius are tuned. It is written to the app's own database,
+never to a third party, carries no coordinates, and is deleted after 180 days.
 
 Note on Precise Location: coordinates are processed on the device and are never
 transmitted or stored. Only the identifier of a venue the user explicitly
@@ -99,6 +108,9 @@ The app's single purpose is letting a user tell accepted friends that they are o
 
 THE FEATURE THAT NEEDS PERSISTENT LOCATION
 Arrival detection is the app's core feature and it cannot work without continuous updates. The phone is in the user's pocket when they walk into a bar, so the app has to keep receiving fixes to (1) match the position against the on-device catalog, and (2) confirm the user is still at the same venue five minutes later, which is what separates settling in from walking past. Sitting still at a bar is the case that has to work, so movement-triggered options are not sufficient: region entry alone fires as the user passes the door and cannot establish the dwell, and significant-change updates are too coarse to tell one venue from its neighbours. Departure detection has the same requirement: the status is cleared automatically once the user is outside the venue's radius, which is only observable from ongoing updates. A screen recording of this happening on a physical device is attached to this submission.
+
+WHAT THE APP MEASURES
+The app records its own prompts and the user's answers to them — that it asked about a named venue, how long the venue had been in range, roughly how far away the user was, what they answered, and whether a notification was opened — so that the dwell time and the check-in radius can be tuned. No coordinates are stored with these records, they are written only to the app's own database, no third-party analytics or advertising SDK is present, and they are deleted after 180 days.
 
 MODERATING USER CONTENT
 The only user-generated content is drink photos, their notes, and comments and emoji reactions on photos and on arrivals and departures. A user can share a photo they can see onto their own feed, which shows it to their accepted friends; nothing is ever visible without an accepted friendship, and there is no public timeline. Every post in the feed can be reported by anyone who can see it (long-press the card, or the post screen) and every author can be blocked, which hides both people's posts and comments from each other. Reports reach the developer, who removes content and accounts.

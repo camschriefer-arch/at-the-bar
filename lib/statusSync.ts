@@ -14,6 +14,7 @@ import {
   allowVenue,
   clearPendingVenue,
   getPendingVenue,
+  measurePending,
   muteVenuePrompts,
   promptForVenues,
   promptsBlocked,
@@ -52,23 +53,30 @@ async function dwelledVenues(
  * the numbers behind the dwell and the radius, and until they are written down
  * every change to either is a guess.
  */
-function notePrompt(
+async function notePrompt(
   point: LatLng,
   asked: readonly Bar[],
   source: string,
   sighting: Sighting | null
-): void {
+): Promise<void> {
   if (asked.length === 0) return;
 
   const nearest = asked[0];
   const seen = sighting?.[nearest.id];
+  const meters = distanceMeters(point, nearest);
+  const dwelledMs = seen ? Math.max(0, Date.now() - seen.since) : null;
+
   void logEvent('prompt_shown', {
     barId: asked.length === 1 ? nearest.id : null,
     source,
     venueCount: asked.length,
-    meters: distanceMeters(point, nearest),
-    dwelledMs: seen ? Math.max(0, Date.now() - seen.since) : null,
+    meters,
+    dwelledMs,
   });
+
+  // The answer is written where the question was, so yes and no can be
+  // compared at the same distance and the same dwell.
+  await measurePending(meters, dwelledMs);
 }
 
 /** The last fix the app was given, wherever it came from. */
@@ -174,13 +182,18 @@ export async function syncStatusForLocation(
 
   if (immediate) {
     const asked = await promptForVenues(candidates, { force: true });
-    notePrompt(point, asked, 'manual', parseSighting(await AsyncStorage.getItem(SIGHTING_KEY)));
+    await notePrompt(
+      point,
+      asked,
+      'manual',
+      parseSighting(await AsyncStorage.getItem(SIGHTING_KEY))
+    );
     return { bar: null, changed: left };
   }
 
   const { dwelled, sighting } = await dwelledVenues(candidates.map((venue) => venue.id));
   const ready = candidates.filter((venue) => dwelled.includes(venue.id));
-  if (ready.length > 0) notePrompt(point, await promptForVenues(ready), 'auto', sighting);
+  if (ready.length > 0) await notePrompt(point, await promptForVenues(ready), 'auto', sighting);
 
   return { bar: null, changed: left };
 }
@@ -232,11 +245,18 @@ export async function checkInAt(barId: string, barName: string, source: string):
   await clearPendingVenue();
   await askLaterIfStillHere(barId, barName);
 
+  // A check-in only answers the prompt if that prompt offered this venue: Join
+  // and an added venue can land while an unrelated question is still standing,
+  // and counting those as answers would read as a prompt that worked.
+  const answers = pending?.choices.some((choice) => choice.barId === barId) ? pending : null;
+
   void logEvent('check_in', {
     barId,
     source,
-    venueCount: pending?.choices.length ?? null,
-    answeredInMs: pending ? Date.now() - pending.promptedAt : null,
+    venueCount: answers?.choices.length ?? null,
+    answeredInMs: answers ? Date.now() - answers.promptedAt : null,
+    meters: answers?.meters ?? null,
+    dwelledMs: answers?.dwelledMs ?? null,
   });
 }
 

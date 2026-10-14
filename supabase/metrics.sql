@@ -291,3 +291,131 @@ limit 50;
 -- Blocks, as a health signal rather than a list to act on.
 select count(*) as blocks, count(distinct blocker_id) as people_blocking
 from user_blocks;
+
+-- ---------------------------------------------------------------------------
+-- 6. What people do with the app, from app_events
+-- ---------------------------------------------------------------------------
+--
+-- Unlike everything above, these read rows the app writes only to be counted.
+-- They answer the questions behind the dwell, the radius and the notification
+-- buttons: how often the app asks, how often it is told no, and what people
+-- press to say yes. An empty result means the build in people's hands predates
+-- the events, not that nothing happened.
+
+-- The prompt funnel: how often the app asked, how often that became a check-in,
+-- and how often it was turned down. A check-in only counts against a prompt if
+-- it answered one (answer_seconds is set) — Join and added venues check people
+-- in without being asked, and counting those would read as over 100% saying
+-- yes.
+select
+  at::date as day,
+  count(*) filter (where event = 'prompt_shown') as asked,
+  count(*) filter (where event = 'check_in' and answer_seconds is not null) as checked_in,
+  count(*) filter (where event = 'check_in' and answer_seconds is null) as checked_in_unasked,
+  count(*) filter (where event = 'prompt_declined') as not_here,
+  round(
+    100.0 * count(*) filter (where event = 'check_in' and answer_seconds is not null)
+      / nullif(count(*) filter (where event = 'prompt_shown'), 0),
+    1
+  ) as percent_said_yes
+from app_events
+where at >= now() - interval '30 days'
+group by day
+order by day desc;
+
+-- How much the app asks of one person in a day. This is the annoyance number:
+-- a median of one is a prompt you notice, a median of six is a prompt you
+-- learn to swipe away.
+select
+  round(
+    (percentile_cont(0.5) within group (order by prompts))::numeric,
+    1
+  ) as median_prompts_a_day,
+  max(prompts) as most_in_one_day,
+  round(avg(prompts)::numeric, 1) as average
+from (
+  select user_id, at::date as day, count(*) as prompts
+  from app_events
+  where event = 'prompt_shown' and at >= now() - interval '30 days'
+  group by user_id, day
+) per_day;
+
+-- Is the dwell right? How long people had been near the venue when it asked,
+-- split by what they then said. If yes and no look the same, waiting longer
+-- buys nothing.
+select
+  event,
+  count(*) as events,
+  round((percentile_cont(0.5) within group (order by dwell_seconds / 60.0))::numeric, 1)
+    as median_minutes_there,
+  round((percentile_cont(0.5) within group (order by distance_meters))::numeric)
+    as median_metres_away
+from app_events
+where event in ('prompt_shown', 'prompt_declined', 'check_in')
+  and at >= now() - interval '30 days'
+  and dwell_seconds is not null
+group by event;
+
+-- Is the radius right? How far away the people who said yes actually were. A
+-- distribution that stops well short of the radius means it can be tightened.
+select
+  width_bucket(distance_meters, 0, 170, 8) * 20 as up_to_metres,
+  count(*) as check_ins
+from app_events
+where event = 'check_in' and distance_meters is not null
+  and at >= now() - interval '30 days'
+group by up_to_metres
+order by up_to_metres;
+
+-- What people tap to check in. 'notification' is the buttons on the prompt
+-- itself, 'picker' the card in the app, 'join' the Join button on the feed,
+-- 'added' a venue they had to add first.
+select
+  coalesce(source, 'unknown') as tapped,
+  count(*) as check_ins,
+  count(distinct user_id) as people,
+  round((percentile_cont(0.5) within group (order by answer_seconds))::numeric)
+    as median_seconds_to_answer
+from app_events
+where event = 'check_in' and at >= now() - interval '30 days'
+group by source
+order by check_ins desc;
+
+-- Which pushes get opened. The outbox says what was sent; this says what
+-- anybody did about it.
+select
+  coalesce(source, 'unknown') as push,
+  count(*) as opened,
+  count(distinct user_id) as people
+from app_events
+where event = 'notification_opened' and at >= now() - interval '30 days'
+group by source
+order by opened desc;
+
+-- Venues the app keeps asking about and nobody is ever at. Usually a wrong
+-- coordinate in the catalog, or a venue that shares a building with one.
+select
+  b.name,
+  coalesce(b.city, '-') as city,
+  count(*) filter (where e.event = 'prompt_shown') as asked,
+  count(*) filter (where e.event = 'prompt_declined') as not_here,
+  count(*) filter (where e.event = 'check_in') as checked_in
+from app_events e
+join bars b on b.id = e.bar_id
+where e.at >= now() - interval '30 days'
+group by b.id, b.name, b.city
+having count(*) filter (where e.event = 'prompt_shown') >= 3
+   and count(*) filter (where e.event = 'check_in') = 0
+order by asked desc
+limit 25;
+
+-- Manual check-ins that found nothing, with how far the nearest venue was.
+-- This is "I was definitely at a bar and it did not ask" in numbers.
+select
+  count(*) as attempts,
+  count(distinct user_id) as people,
+  round((percentile_cont(0.5) within group (order by distance_meters))::numeric)
+    as median_metres_to_nearest,
+  count(*) filter (where distance_meters <= 170) as nearest_was_in_range
+from app_events
+where event = 'check_in_found_nothing' and at >= now() - interval '30 days';

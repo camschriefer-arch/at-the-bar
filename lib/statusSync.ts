@@ -271,9 +271,33 @@ export async function clearStatus(): Promise<void> {
 /**
  * Ends a visit the user says is over, from the "Still at the bar?" question.
  * `forTheNight` also stops the app asking about anywhere else until morning,
- * which is the difference between leaving one bar and going home.
+ * which is the difference between leaving one bar and going home. `barId` is
+ * the venue the question was asked about: an answer can sit in the tray for
+ * hours, and by then the user may be somewhere else entirely, which is not a
+ * visit they said anything about.
  */
-export async function checkOutByHand(forTheNight: boolean): Promise<void> {
+export async function checkOutByHand(barId: string, forTheNight: boolean): Promise<void> {
+  const current = await AsyncStorage.getItem(LAST_BAR_KEY);
+  if (current !== null && current !== barId) {
+    // Stale: only the mute carries, since "done for the night" is about the
+    // night rather than the venue.
+    if (forTheNight) await muteVenuePrompts();
+    return;
+  }
+
   await clearStatus();
   if (forTheNight) await muteVenuePrompts();
+}
+
+/**
+ * Takes "yes, still here" as the user saying so. Their phone may not be
+ * reporting at all — that is the case the question exists for — so without
+ * this the server would expire a visit the user has just confirmed twice.
+ */
+export async function confirmStillHere(barId: string): Promise<void> {
+  // Strict, unlike checking out: saying yes must never put a status back that
+  // the user has since ended elsewhere.
+  if ((await AsyncStorage.getItem(LAST_BAR_KEY)) !== barId) return;
+
+  await writeStatus(barId);
 }

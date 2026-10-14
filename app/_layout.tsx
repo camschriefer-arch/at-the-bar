@@ -11,7 +11,7 @@ import { AuthProvider, useAuth } from '../lib/AuthProvider';
 import { getPermissionLevel, resumeBackgroundUpdates } from '../lib/locationService';
 import { registerForPushNotifications } from '../lib/notifications';
 import { clearLocationReminderSnooze, isLocationReminderSnoozed } from '../lib/onboarding';
-import { checkInAt, checkOutByHand } from '../lib/statusSync';
+import { checkInAt, checkOutByHand, confirmStillHere } from '../lib/statusSync';
 import { STILL_HERE_DONE, STILL_HERE_NO, STILL_HERE_YES } from '../lib/stillHere';
 import { colors } from '../lib/theme';
 import {
@@ -158,12 +158,16 @@ function RootNavigator() {
       return;
     }
 
-    if (kind === 'venue-still-here') {
-      // "Yes, still here" is the one answer with nothing to do: the status is
-      // already what it says, and the next question is already scheduled.
-      if (tapped.actionIdentifier === STILL_HERE_NO) void checkOutByHand(false);
-      else if (tapped.actionIdentifier === STILL_HERE_DONE) void checkOutByHand(true);
-      else if (tapped.actionIdentifier !== STILL_HERE_YES) {
+    if (kind === 'venue-still-here' && barId) {
+      // Every answer is about the venue the question named, which an answer
+      // given hours later need not be where the user is any more.
+      if (tapped.actionIdentifier === STILL_HERE_NO) void checkOutByHand(barId, false);
+      else if (tapped.actionIdentifier === STILL_HERE_DONE) void checkOutByHand(barId, true);
+      else if (tapped.actionIdentifier === STILL_HERE_YES) {
+        // Yes is what keeps the visit alive: a phone that only reports in the
+        // foreground tells the server nothing, and a silent status is expired.
+        void confirmStillHere(barId);
+      } else {
         router.navigate('/(tabs)/profile');
       }
       return;

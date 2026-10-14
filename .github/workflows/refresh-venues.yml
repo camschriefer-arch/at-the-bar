@@ -50,16 +50,3 @@ jobs:
               python3 scripts/import_places.py --country "$country"
             done
           fi
-
-      - name: Drop expired behaviour events
-        # Nothing in the app calls this, so the monthly job is where the
-        # retention window in the privacy policy is actually enforced.
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-        run: |
-          curl -fsS -X POST "$SUPABASE_URL/rest/v1/rpc/prune_app_events" \
-            -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
-            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
-            -H 'Content-Type: application/json' \
-            -d '{}'

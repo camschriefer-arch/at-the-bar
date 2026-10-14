@@ -67,6 +67,23 @@ create policy "log own events" on app_events for insert
 with
   check (user_id = auth.uid ());
 
+-- The client says what happened, never who it happened to or when: both are
+-- taken from the connection and the clock instead, so a tampered-with client
+-- cannot date an event into a window it was not in or file it under someone
+-- else. Column privileges are only checked for columns an insert names, so
+-- omitting them still picks up auth.uid() and now().
+revoke insert on table app_events from authenticated;
+
+grant insert (
+  event,
+  bar_id,
+  source,
+  venue_count,
+  dwell_seconds,
+  distance_meters,
+  answer_seconds
+) on table app_events to authenticated;
+
 /**
  * Drops events past the retention window. Behaviour questions are answered in
  * weeks and the aggregates worth keeping are read long before this, so holding

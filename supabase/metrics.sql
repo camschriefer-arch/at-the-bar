@@ -303,14 +303,18 @@ from user_blocks;
 -- the events, not that nothing happened.
 
 -- The prompt funnel: how often the app asked, how often that became a check-in,
--- and how often it was turned down.
+-- and how often it was turned down. A check-in only counts against a prompt if
+-- it answered one (answer_seconds is set) — Join and added venues check people
+-- in without being asked, and counting those would read as over 100% saying
+-- yes.
 select
   at::date as day,
   count(*) filter (where event = 'prompt_shown') as asked,
-  count(*) filter (where event = 'check_in') as checked_in,
+  count(*) filter (where event = 'check_in' and answer_seconds is not null) as checked_in,
+  count(*) filter (where event = 'check_in' and answer_seconds is null) as checked_in_unasked,
   count(*) filter (where event = 'prompt_declined') as not_here,
   round(
-    100.0 * count(*) filter (where event = 'check_in')
+    100.0 * count(*) filter (where event = 'check_in' and answer_seconds is not null)
       / nullif(count(*) filter (where event = 'prompt_shown'), 0),
     1
   ) as percent_said_yes

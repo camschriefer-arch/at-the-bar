@@ -26,6 +26,10 @@ export type PendingVenue = {
   choices: PendingChoice[];
   promptedAt: number;
   notificationId?: string;
+  /** How far off the nearest of them was when asked. */
+  meters?: number;
+  /** How long it had been in range when asked. */
+  dwelledMs?: number;
 };
 
 let categoryRegistered = false;
@@ -110,6 +114,10 @@ export async function declinePendingVenue(source = 'app'): Promise<void> {
       source,
       venueCount: choices.length,
       answeredInMs: pending ? Date.now() - pending.promptedAt : null,
+      // Carried from the prompt: an answer is only worth measuring against the
+      // distance and the dwell that the app decided to ask on.
+      meters: pending?.meters ?? null,
+      dwelledMs: pending?.dwelledMs ?? null,
     });
   }
 
@@ -207,6 +215,25 @@ export async function promptForVenues(
   );
 
   return bars;
+}
+
+/**
+ * Keeps what the app knew when it asked alongside the prompt itself, so the
+ * answer can be measured against it. The distance and the dwell are only known
+ * at the moment of asking, and the answer can arrive hours later.
+ */
+export async function measurePending(meters: number, dwelledMs: number | null): Promise<void> {
+  const pending = await getPendingVenue();
+  if (!pending) return;
+
+  await AsyncStorage.setItem(
+    PENDING_KEY,
+    JSON.stringify({
+      ...pending,
+      meters,
+      ...(dwelledMs === null ? {} : { dwelledMs }),
+    } satisfies PendingVenue)
+  );
 }
 
 /** The venue the user was last asked about and has not answered yet. */

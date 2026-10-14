@@ -126,8 +126,10 @@ function RootNavigator() {
     handledTap.current = identifier;
     void Notifications.clearLastNotificationResponseAsync();
 
-    const { friendId, kind, barId, barName, postId, event } = tapped.notification.request.content
-      .data as BarEventPayload;
+    // A push carrying no data at all leaves this null rather than empty, and a
+    // tap on one used to take the whole app down with it.
+    const { friendId, kind, barId, barName, postId, event } = (tapped.notification.request.content
+      .data ?? {}) as BarEventPayload;
     // Whether anyone opens a push at all, and which kind they open, is the
     // thing the outbox cannot say: it only knows what was sent.
     void logEvent('notification_opened', {

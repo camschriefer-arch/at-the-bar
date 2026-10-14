@@ -2,6 +2,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 
 import { logEvent } from './analytics';
+import {
+  countPrompt,
+  nextMorning,
+  parseMute,
+  parseTally,
+  promptBlock,
+  type PromptBlock,
+} from './promptBudget';
 import type { Bar } from './types';
 import {
   DECLINE_QUIET_MS,
@@ -14,10 +22,13 @@ import {
 export const VENUE_PROMPT_CATEGORY = 'venue.confirm';
 export const VENUE_PROMPT_CONFIRM = 'venue.confirm.yes';
 export const VENUE_PROMPT_DISMISS = 'venue.confirm.no';
+export const VENUE_PROMPT_MUTE = 'venue.confirm.notout';
 
 const PENDING_KEY = 'atb:pendingVenue';
 const PROMPTED_KEY = 'atb:promptedVenues';
 const DECLINED_KEY = 'atb:declinedVenues';
+const MUTE_KEY = 'atb:venueMute';
+const TALLY_KEY = 'atb:promptTally';
 
 export type PendingChoice = { barId: string; barName: string };
 
@@ -43,6 +54,11 @@ async function ensureCategory(): Promise<void> {
     {
       identifier: VENUE_PROMPT_DISMISS,
       buttonTitle: 'Not here',
+      options: { opensAppToForeground: false },
+    },
+    {
+      identifier: VENUE_PROMPT_MUTE,
+      buttonTitle: 'Not out today',
       options: { opensAppToForeground: false },
     },
   ]);
@@ -116,6 +132,27 @@ export async function declinePendingVenue(source = 'app'): Promise<void> {
   await clearPendingVenue();
 }
 
+/**
+ * Silences every venue until the morning. This is the answer to a prompt that
+ * was simply unwelcome rather than wrong: "Not here" is about a venue, and on
+ * a block of them it has to be given venue by venue, which is the thing that
+ * makes the app feel like it is nagging. One tap ends the day instead.
+ */
+export async function muteVenuePrompts(now = Date.now()): Promise<void> {
+  await AsyncStorage.setItem(MUTE_KEY, JSON.stringify({ until: nextMorning(now) }));
+  await clearPendingVenue();
+}
+
+/** Why nothing is being raised at all right now, or null if it would be. */
+export async function promptsBlocked(now = Date.now()): Promise<PromptBlock | null> {
+  const [mute, tally] = await Promise.all([
+    AsyncStorage.getItem(MUTE_KEY).then(parseMute),
+    AsyncStorage.getItem(TALLY_KEY).then(parseTally),
+  ]);
+
+  return promptBlock(mute, tally, now);
+}
+
 /** The two quiet periods as they stand, for explaining a prompt that never came. */
 export async function quietVenues(): Promise<{
   prompted: QuietVenues;
@@ -131,7 +168,7 @@ export async function quietVenues(): Promise<{
 
 /** Drops both quiet periods, for a user who wants to be asked again now. */
 export async function askAgainEverywhere(): Promise<void> {
-  await AsyncStorage.multiRemove([PROMPTED_KEY, DECLINED_KEY]);
+  await AsyncStorage.multiRemove([PROMPTED_KEY, DECLINED_KEY, MUTE_KEY, TALLY_KEY]);
 }
 
 /**
@@ -161,14 +198,18 @@ export async function allowVenue(barId: string): Promise<void> {
  * picks from a list in the app. Venues already asked about are dropped from
  * the list rather than silencing it: a bar down the street from one you were
  * asked about earlier is a new visit, and one turned down stays quiet for a
- * fortnight. `force` re-asks inside either quiet period, for a prompt the user
- * asked for by hand. Returns the venues actually asked about, which is what
- * the caller measures rather than the list it offered.
+ * fortnight. A day's worth of prompts, or a user who said they are not out,
+ * stops the lot: the quiet periods are per venue and cannot see how many
+ * notifications a person has had. `force` re-asks through all of it, for a
+ * prompt the user asked for by hand. Returns the venues actually asked about,
+ * which is what the caller measures rather than the list it offered.
  */
 export async function promptForVenues(
   candidates: readonly Bar[],
   { force = false } = {}
 ): Promise<Bar[]> {
+  if (!force && (await promptsBlocked()) !== null) return [];
+
   const quiet = force
     ? candidates.map(() => false)
     : await Promise.all(candidates.map((bar) => isSuppressed(bar.id)));
@@ -195,7 +236,7 @@ export async function promptForVenues(
       // A list cannot be picked from a notification button.
       ...(single ? { categoryIdentifier: VENUE_PROMPT_CATEGORY } : {}),
       data: single
-        ? { kind: 'venue-confirm', barId: single.id }
+        ? { kind: 'venue-confirm', barId: single.id, barName: single.name }
         : { kind: 'venue-choose' },
     },
     trigger: null,
@@ -204,6 +245,14 @@ export async function promptForVenues(
   await AsyncStorage.setItem(
     PENDING_KEY,
     JSON.stringify({ choices, promptedAt: Date.now(), notificationId } satisfies PendingVenue)
+  );
+
+  // One notification about several venues is one prompt, which is what the cap
+  // counts: it is there to limit interruptions, not venues.
+  const now = Date.now();
+  await AsyncStorage.setItem(
+    TALLY_KEY,
+    JSON.stringify(countPrompt(parseTally(await AsyncStorage.getItem(TALLY_KEY)), now))
   );
 
   return bars;

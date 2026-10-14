@@ -11,18 +11,22 @@ import { AuthProvider, useAuth } from '../lib/AuthProvider';
 import { getPermissionLevel, resumeBackgroundUpdates } from '../lib/locationService';
 import { registerForPushNotifications } from '../lib/notifications';
 import { clearLocationReminderSnooze, isLocationReminderSnoozed } from '../lib/onboarding';
-import { checkInAt } from '../lib/statusSync';
+import { checkInAt, checkOutByHand } from '../lib/statusSync';
+import { STILL_HERE_DONE, STILL_HERE_NO, STILL_HERE_YES } from '../lib/stillHere';
 import { colors } from '../lib/theme';
 import {
   declinePendingVenue,
+  muteVenuePrompts,
   VENUE_PROMPT_CONFIRM,
   VENUE_PROMPT_DISMISS,
+  VENUE_PROMPT_MUTE,
 } from '../lib/venuePrompt';
 
 type BarEventPayload = {
   friendId?: string;
   kind?: string;
   barId?: string;
+  barName?: string;
   postId?: string;
   event?: string;
 };
@@ -122,7 +126,7 @@ function RootNavigator() {
     handledTap.current = identifier;
     void Notifications.clearLastNotificationResponseAsync();
 
-    const { friendId, kind, barId, postId, event } = tapped.notification.request.content
+    const { friendId, kind, barId, barName, postId, event } = tapped.notification.request.content
       .data as BarEventPayload;
     // Whether anyone opens a push at all, and which kind they open, is the
     // thing the outbox cannot say: it only knows what was sent.
@@ -154,12 +158,27 @@ function RootNavigator() {
       return;
     }
 
+    if (kind === 'venue-still-here') {
+      // "Yes, still here" is the one answer with nothing to do: the status is
+      // already what it says, and the next question is already scheduled.
+      if (tapped.actionIdentifier === STILL_HERE_NO) void checkOutByHand(false);
+      else if (tapped.actionIdentifier === STILL_HERE_DONE) void checkOutByHand(true);
+      else if (tapped.actionIdentifier !== STILL_HERE_YES) {
+        router.navigate('/(tabs)/profile');
+      }
+      return;
+    }
+
     if (kind !== 'venue-confirm' && kind !== 'venue-choose') return;
 
     if (tapped.actionIdentifier === VENUE_PROMPT_DISMISS) {
       void declinePendingVenue('notification');
-    } else if (tapped.actionIdentifier === VENUE_PROMPT_CONFIRM && barId) {
-      void checkInAt(barId, 'notification');
+    } else if (tapped.actionIdentifier === VENUE_PROMPT_MUTE) {
+      // Turning the prompt down and going quiet are one tap, so the decline is
+      // still recorded against the venue that happened to ask.
+      void declinePendingVenue('not-out-today').then(() => muteVenuePrompts());
+    } else if (tapped.actionIdentifier === VENUE_PROMPT_CONFIRM && barId && barName) {
+      void checkInAt(barId, barName, 'notification');
     } else {
       // Tapping the notification itself opens the screen that asks again. The
       // tap carries its own identifier because the You tab is often already the

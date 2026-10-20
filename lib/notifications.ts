@@ -8,6 +8,11 @@ import { supabase } from './supabase';
 const TOKEN_KEY = 'atb:pushToken';
 const ANDROID_CHANNEL = 'bar-events';
 
+// Colons and dashes break category identifiers, so these read as names.
+export const COMPANION_PROMPT_CATEGORY = 'companion.confirm';
+export const COMPANION_PROMPT_CONFIRM = 'companion.confirm.yes';
+export const COMPANION_PROMPT_DECLINE = 'companion.confirm.no';
+
 type EasExtra = { eas?: { projectId?: string } };
 
 Notifications.setNotificationHandler({
@@ -33,6 +38,28 @@ function projectId(): string {
 }
 
 /**
+ * The Yes and No buttons on the push that says a friend has named you as being
+ * with them. The server names this category on that push, and a category it
+ * does not know is ignored, so this is registered on every launch rather than
+ * only when a notification arrives.
+ */
+export async function registerNotificationCategories(): Promise<void> {
+  await Notifications.setNotificationCategoryAsync(COMPANION_PROMPT_CATEGORY, [
+    {
+      identifier: COMPANION_PROMPT_CONFIRM,
+      buttonTitle: 'Yes',
+      // Agreeing writes to the server, so the app has to come up to do it.
+      options: { opensAppToForeground: true },
+    },
+    {
+      identifier: COMPANION_PROMPT_DECLINE,
+      buttonTitle: 'No',
+      options: { opensAppToForeground: false },
+    },
+  ]);
+}
+
+/**
  * Asks for notification permission and stores this device's Expo push token
  * against the signed-in user. Returns null when the user says no.
  */
@@ -43,6 +70,8 @@ export async function registerForPushNotifications(): Promise<string | null> {
       importance: Notifications.AndroidImportance.DEFAULT,
     });
   }
+
+  await registerNotificationCategories();
 
   const existing = await Notifications.getPermissionsAsync();
   const granted =

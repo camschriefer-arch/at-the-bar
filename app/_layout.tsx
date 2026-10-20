@@ -8,8 +8,13 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { logEvent } from '../lib/analytics';
 import { expireStaleStatus } from '../lib/api';
 import { AuthProvider, useAuth } from '../lib/AuthProvider';
+import { respondToCompanionTag } from '../lib/companions';
 import { getPermissionLevel, resumeBackgroundUpdates } from '../lib/locationService';
-import { registerForPushNotifications } from '../lib/notifications';
+import {
+  COMPANION_PROMPT_CONFIRM,
+  COMPANION_PROMPT_DECLINE,
+  registerForPushNotifications,
+} from '../lib/notifications';
 import { clearLocationReminderSnooze, isLocationReminderSnoozed } from '../lib/onboarding';
 import { checkInAt, checkOutByHand, confirmStillHere } from '../lib/statusSync';
 import { STILL_HERE_DONE, STILL_HERE_NO, STILL_HERE_YES } from '../lib/stillHere';
@@ -29,6 +34,7 @@ type BarEventPayload = {
   barName?: string;
   postId?: string;
   event?: string;
+  visitId?: string;
 };
 
 function RootNavigator() {
@@ -128,8 +134,8 @@ function RootNavigator() {
 
     // A push carrying no data at all leaves this null rather than empty, and a
     // tap on one used to take the whole app down with it.
-    const { friendId, kind, barId, barName, postId, event } = (tapped.notification.request.content
-      .data ?? {}) as BarEventPayload;
+    const { friendId, kind, barId, barName, postId, event, visitId } = (tapped.notification.request
+      .content.data ?? {}) as BarEventPayload;
     // Whether anyone opens a push at all, and which kind they open, is the
     // thing the outbox cannot say: it only knows what was sent.
     void logEvent('notification_opened', {
@@ -149,7 +155,18 @@ function RootNavigator() {
       return;
     }
     if (event === 'tagged') {
-      // Being named waits on a yes, and the You tab is where it is answered.
+      // Answered from the notification's own buttons there is nothing to open:
+      // a no is the whole answer, and a yes only has to reach the server, which
+      // the card on the You tab would otherwise have done.
+      if (visitId && tapped.actionIdentifier === COMPANION_PROMPT_DECLINE) {
+        void respondToCompanionTag(visitId, false).catch(() => undefined);
+        return;
+      }
+      if (visitId && tapped.actionIdentifier === COMPANION_PROMPT_CONFIRM) {
+        void respondToCompanionTag(visitId, true).catch(() => undefined);
+      }
+      // Being named waits on a yes, and the You tab is where it is answered —
+      // and where an answer that failed to reach the server still stands.
       router.navigate(`/(tabs)/profile?ask=${identifier}`);
       return;
     }

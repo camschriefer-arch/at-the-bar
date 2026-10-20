@@ -174,6 +174,16 @@ export async function quietVenues(): Promise<{
   return { prompted, declined };
 }
 
+/**
+ * Holds a venue quiet for the usual cooldown, for a visit the user has just
+ * said is over. They are often still inside the radius when they say so, and
+ * the dwell clock restarts from the moment the status ends, so without this the
+ * app asks about the bar they have just left minutes later.
+ */
+export async function quietenVenue(barId: string): Promise<void> {
+  await recordQuiet(PROMPTED_KEY, [barId], PROMPT_COOLDOWN_MS);
+}
+
 /** Drops both quiet periods, for a user who wants to be asked again now. */
 export async function askAgainEverywhere(): Promise<void> {
   await AsyncStorage.multiRemove([PROMPTED_KEY, DECLINED_KEY, MUTE_KEY, TALLY_KEY]);

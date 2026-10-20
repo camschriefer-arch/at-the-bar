@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import { stopBackgroundUpdates } from './locationService';
 import { unregisterPushNotifications } from './notifications';
 import { setSharingEnabled } from './sharing';
+import { askAgainEverywhere } from './venuePrompt';
 import { clearStatus } from './statusSync';
 import { supabase } from './supabase';
 
@@ -56,6 +57,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           clearStatus(),
           setSharingEnabled(true),
           unregisterPushNotifications(),
+          // The quiet periods, the mute and the day's prompt tally are about
+          // the person who answered them, not the phone.
+          askAgainEverywhere(),
         ]);
 
         const { error } = await supabase.auth.signOut();

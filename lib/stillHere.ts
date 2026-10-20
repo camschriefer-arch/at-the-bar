@@ -29,13 +29,14 @@ async function ensureCategory(): Promise<void> {
     {
       identifier: STILL_HERE_YES,
       buttonTitle: 'Yes, still here',
-      // Saying nothing changed changes nothing, so the app can stay closed.
-      options: { opensAppToForeground: false },
+      // The server expires a visit that stops being reported, so a confirmation
+      // has to reach it; nothing else on a closed phone can carry the answer.
+      options: { opensAppToForeground: true },
     },
     {
       identifier: STILL_HERE_NO,
       buttonTitle: 'No, I left',
-      // Both of these end the visit on the server, so the app has to come up.
+      // Every answer ends up on the server, so the app has to come up for it.
       options: { opensAppToForeground: true },
     },
     {
@@ -51,9 +52,8 @@ async function ensureCategory(): Promise<void> {
 /**
  * Asks, every few hours from now, whether the user is still at `barName`. They
  * are scheduled all at once because the app may never run again in between: a
- * backgrounded phone cannot arm the next question after answering this one, and
- * "Yes, still here" deliberately does not wake it. Answering No or Done cancels
- * the rest.
+ * backgrounded phone cannot arm the next question after answering this one.
+ * Answering No or Done cancels the rest.
  */
 export async function askLaterIfStillHere(barId: string, barName: string): Promise<void> {
   await stopAskingIfStillHere();

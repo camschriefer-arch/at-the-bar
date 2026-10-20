@@ -1,5 +1,6 @@
 import type { CheckInReport, VenueReport } from './diagnosis.ts';
 import { formatMinutes } from './duration.ts';
+import { DAILY_PROMPT_CAP } from './promptBudget.ts';
 import { DWELL_MS } from './venues.ts';
 
 const FEET_PER_METER = 3.28084;
@@ -43,6 +44,14 @@ export function describeTracking(report: CheckInReport): string {
 
 /** The one sentence to lead with: why no prompt came. */
 export function summarise(report: CheckInReport): string {
+  if (report.blocked === 'muted') {
+    return 'You said you were not out today, so nothing will be raised until the morning. Ask me again to undo that.';
+  }
+
+  if (report.blocked === 'capped') {
+    return `You have already been asked ${DAILY_PROMPT_CAP} times today, which is the most the app asks in a day. Ask me again to clear that.`;
+  }
+
   if (report.venues.length === 0) {
     return report.nearest === null
       ? 'No venues here at all. Add the place if the catalog is missing it.'

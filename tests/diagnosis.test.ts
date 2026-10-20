@@ -79,7 +79,7 @@ test('says nothing is counting when the app has not heard where the phone is', (
     ['not-tracked', 'not-tracked']
   );
   assert.match(
-    summarise({ fixAgeMs: FIX_STALE_MS + 1, tracking: false, nearest: null, venues: stale }),
+    summarise({ fixAgeMs: FIX_STALE_MS + 1, tracking: false, blocked: null, nearest: null, venues: stale }),
     /not reached/
   );
 });
@@ -91,7 +91,7 @@ test('sums up a block where everything has been silenced', () => {
     declined: { joe: NOW - 60_000 },
   });
 
-  assert.match(summarise({ fixAgeMs: 60_000, tracking: true, nearest: null, venues }), /silenced/);
+  assert.match(summarise({ fixAgeMs: 60_000, tracking: true, blocked: null, nearest: null, venues }), /silenced/);
 });
 
 test('names how far off the nearest venue is when none is in range', () => {
@@ -100,14 +100,30 @@ test('names how far off the nearest venue is when none is in range', () => {
 
   assert.equal(nearest?.barName, away.name);
   assert.match(
-    summarise({ fixAgeMs: 60_000, tracking: true, nearest, venues }),
+    summarise({ fixAgeMs: 60_000, tracking: true, blocked: null, nearest, venues }),
     /close enough.*Across Town/
   );
 });
 
 test('says the catalog knows nowhere at all when it has no venue to name', () => {
   assert.match(
-    summarise({ fixAgeMs: 60_000, tracking: true, nearest: null, venues: [] }),
+    summarise({ fixAgeMs: 60_000, tracking: true, blocked: null, nearest: null, venues: [] }),
     /No venues here at all/
+  );
+});
+
+test('a muted day and a spent allowance are said before anything about venues', () => {
+  const venues = reportOnVenues(HERE, [jake], {
+    ...state,
+    sighting: { jake: { since: NOW - DWELL_MS, last: NOW } },
+  });
+
+  assert.match(
+    summarise({ fixAgeMs: 60_000, tracking: true, blocked: 'muted', nearest: null, venues }),
+    /not out today/
+  );
+  assert.match(
+    summarise({ fixAgeMs: 60_000, tracking: true, blocked: 'capped', nearest: null, venues }),
+    /most the app asks in a day/
   );
 });

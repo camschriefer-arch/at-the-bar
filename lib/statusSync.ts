@@ -18,6 +18,7 @@ import {
   muteVenuePrompts,
   promptForVenues,
   promptsBlocked,
+  quietenVenue,
   quietVenues,
 } from './venuePrompt';
 import type { Bar } from './types';
@@ -286,6 +287,7 @@ export async function checkOutByHand(barId: string, forTheNight: boolean): Promi
   }
 
   await clearStatus();
+  await quietenVenue(barId);
   if (forTheNight) await muteVenuePrompts();
 }
 

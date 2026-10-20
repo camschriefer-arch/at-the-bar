@@ -6,6 +6,7 @@ import { nearestVenue, reportOnVenues, type CheckInReport } from './diagnosis';
 import { distanceMeters, type LatLng } from './geo';
 import { isBackgroundUpdatesRunning } from './locationService';
 import { flushPendingNotifications } from './notifications';
+import { askLaterIfStillHere, stopAskingIfStillHere } from './stillHere';
 import { supabase } from './supabase';
 import { isMoving, type Fix } from './motion';
 import { noteSighting, parseSighting, stillAt, venuesToConfirm, type Sighting } from './venues';
@@ -14,7 +15,9 @@ import {
   clearPendingVenue,
   getPendingVenue,
   measurePending,
+  muteVenuePrompts,
   promptForVenues,
+  promptsBlocked,
   quietVenues,
 } from './venuePrompt';
 import type { Bar } from './types';
@@ -155,6 +158,7 @@ export async function syncStatusForLocation(
   if (left) {
     await writeStatus(null);
     await clearPendingVenue();
+    await stopAskingIfStillHere();
   }
 
   const candidates = venuesToConfirm(point, venues);
@@ -202,18 +206,20 @@ export async function syncStatusForLocation(
  * which of those happened.
  */
 export async function diagnoseCheckIn(point: LatLng): Promise<CheckInReport> {
-  const [venues, fix, quiet, tracking, sighting] = await Promise.all([
+  const [venues, fix, quiet, tracking, sighting, blocked] = await Promise.all([
     barsNear(point),
     lastFix(),
     quietVenues(),
     isBackgroundUpdatesRunning(),
     AsyncStorage.getItem(SIGHTING_KEY).then(parseSighting),
+    promptsBlocked(),
   ]);
 
   const now = Date.now();
   return {
     fixAgeMs: fix ? Math.max(0, now - fix.at) : null,
     tracking,
+    blocked,
     nearest: nearestVenue(point, venues),
     venues: reportOnVenues(point, venues, {
       sighting,
@@ -231,12 +237,13 @@ export async function diagnoseCheckIn(point: LatLng): Promise<CheckInReport> {
  * venue they added, or Join — which is the only way to tell whether the
  * buttons on a notification are worth having.
  */
-export async function checkInAt(barId: string, source: string): Promise<void> {
+export async function checkInAt(barId: string, barName: string, source: string): Promise<void> {
   const pending = await getPendingVenue();
 
   await writeStatus(barId);
   await allowVenue(barId);
   await clearPendingVenue();
+  await askLaterIfStillHere(barId, barName);
 
   // A check-in only answers the prompt if that prompt offered this venue: Join
   // and an added venue can land while an unrelated question is still standing,
@@ -257,5 +264,40 @@ export async function clearStatus(): Promise<void> {
   await AsyncStorage.multiRemove([LAST_BAR_KEY, SIGHTING_KEY, FIX_KEY, TOUCH_KEY]);
   await supabase.rpc('set_current_bar', { p_bar_id: null });
   await clearPendingVenue();
+  await stopAskingIfStillHere();
   await flushPendingNotifications();
+}
+
+/**
+ * Ends a visit the user says is over, from the "Still at the bar?" question.
+ * `forTheNight` also stops the app asking about anywhere else until morning,
+ * which is the difference between leaving one bar and going home. `barId` is
+ * the venue the question was asked about: an answer can sit in the tray for
+ * hours, and by then the user may be somewhere else entirely, which is not a
+ * visit they said anything about.
+ */
+export async function checkOutByHand(barId: string, forTheNight: boolean): Promise<void> {
+  const current = await AsyncStorage.getItem(LAST_BAR_KEY);
+  if (current !== null && current !== barId) {
+    // Stale: only the mute carries, since "done for the night" is about the
+    // night rather than the venue.
+    if (forTheNight) await muteVenuePrompts();
+    return;
+  }
+
+  await clearStatus();
+  if (forTheNight) await muteVenuePrompts();
+}
+
+/**
+ * Takes "yes, still here" as the user saying so. Their phone may not be
+ * reporting at all — that is the case the question exists for — so without
+ * this the server would expire a visit the user has just confirmed twice.
+ */
+export async function confirmStillHere(barId: string): Promise<void> {
+  // Strict, unlike checking out: saying yes must never put a status back that
+  // the user has since ended elsewhere.
+  if ((await AsyncStorage.getItem(LAST_BAR_KEY)) !== barId) return;
+
+  await writeStatus(barId);
 }

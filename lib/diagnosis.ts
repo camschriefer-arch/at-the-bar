@@ -1,5 +1,6 @@
 import { AT_BAR_RADIUS_METERS, distanceMeters, type LatLng } from './geo.ts';
 import { FIX_STALE_MS, type Fix } from './motion.ts';
+import type { PromptBlock } from './promptBudget.ts';
 import {
   DECLINE_QUIET_MS,
   DWELL_MS,
@@ -35,6 +36,8 @@ export type CheckInReport = {
   venues: VenueReport[];
   /** The closest venue in the catalog, in range or not. */
   nearest: { barName: string; meters: number } | null;
+  /** Whether nothing at all is being raised, whatever the venues say. */
+  blocked: PromptBlock | null;
 };
 
 type Named = LatLng & { id: string; name: string };

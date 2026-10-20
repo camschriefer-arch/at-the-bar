@@ -23,9 +23,14 @@ type CheckInReportCardProps = {
  * to go on.
  */
 export function CheckInReportCard({ report, onAskAgain, busy }: CheckInReportCardProps) {
-  const silenced = report.venues.some(
-    (venue) => venue.verdict === 'asked-already' || venue.verdict === 'turned-down'
-  );
+  // The button has to be there whenever the summary tells the user to press it,
+  // and a day's mute or a spent allowance is the one case where no venue around
+  // them looks silenced at all.
+  const silenced =
+    report.blocked !== null ||
+    report.venues.some(
+      (venue) => venue.verdict === 'asked-already' || venue.verdict === 'turned-down'
+    );
 
   return (
     <View style={styles.card}>

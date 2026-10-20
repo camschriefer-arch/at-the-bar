@@ -60,6 +60,7 @@ import {
   askAgainEverywhere,
   declinePendingVenue,
   getPendingVenue,
+  type PendingChoice,
   type PendingVenue,
 } from '../../lib/venuePrompt';
 import { useReload } from '../../lib/useReload';
@@ -226,11 +227,11 @@ export default function ProfileScreen() {
     }
   };
 
-  const confirmPending = async (barId: string) => {
+  const confirmPending = async (choice: PendingChoice) => {
     setBusy(true);
     setError(null);
     try {
-      await checkInAt(barId);
+      await checkInAt(choice.barId, choice.barName, 'picker');
       setPending(null);
       await load();
       await offerCompanions();
@@ -255,7 +256,7 @@ export default function ProfileScreen() {
     setBusy(true);
     setError(null);
     try {
-      await checkInAt(added.id);
+      await checkInAt(added.id, added.name, 'added');
       setPending(null);
       setNothingNearby(false);
       await load();
@@ -472,14 +473,14 @@ export default function ProfileScreen() {
                 <Button
                   key={choice.barId}
                   title={choice.barName}
-                  onPress={() => void confirmPending(choice.barId)}
+                  onPress={() => void confirmPending(choice)}
                   disabled={busy}
                 />
               ))
             ) : (
               <Button
                 title="Yes, I'm here"
-                onPress={() => void confirmPending(pending.choices[0].barId)}
+                onPress={() => void confirmPending(pending.choices[0])}
                 loading={busy}
               />
             )}

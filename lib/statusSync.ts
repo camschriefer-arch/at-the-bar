@@ -1,14 +1,25 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { logEvent } from './analytics';
 import { barsNear } from './barCache';
 import { nearestVenue, reportOnVenues, type CheckInReport } from './diagnosis';
-import { type LatLng } from './geo';
+import { distanceMeters, type LatLng } from './geo';
 import { isBackgroundUpdatesRunning } from './locationService';
 import { flushPendingNotifications } from './notifications';
+import { askLaterIfStillHere, stopAskingIfStillHere } from './stillHere';
 import { supabase } from './supabase';
 import { isMoving, type Fix } from './motion';
-import { noteSighting, parseSighting, stillAt, venuesToConfirm } from './venues';
-import { allowVenue, clearPendingVenue, promptForVenues, quietVenues } from './venuePrompt';
+import { noteSighting, parseSighting, stillAt, venuesToConfirm, type Sighting } from './venues';
+import {
+  allowVenue,
+  clearPendingVenue,
+  getPendingVenue,
+  measurePending,
+  muteVenuePrompts,
+  promptForVenues,
+  promptsBlocked,
+  quietVenues,
+} from './venuePrompt';
 import type { Bar } from './types';
 
 const LAST_BAR_KEY = 'atb:lastBarId';
@@ -27,11 +38,45 @@ const TOUCH_MS = 30 * 60 * 1000;
 export type ResolvedStatus = { bar: Bar | null; changed: boolean };
 
 /** Which of `barIds` the user has been near long enough for them to count. */
-async function dwelledVenues(barIds: readonly string[]): Promise<string[]> {
+async function dwelledVenues(
+  barIds: readonly string[]
+): Promise<{ dwelled: string[]; sighting: Sighting }> {
   const previous = parseSighting(await AsyncStorage.getItem(SIGHTING_KEY));
   const { sighting, dwelled } = noteSighting(previous, barIds, Date.now());
   await AsyncStorage.setItem(SIGHTING_KEY, JSON.stringify(sighting));
-  return dwelled;
+  return { dwelled, sighting };
+}
+
+/**
+ * Records that the app asked, and what it knew when it did: the venue, how far
+ * off the user was and how long it had been watching them sit there. Those are
+ * the numbers behind the dwell and the radius, and until they are written down
+ * every change to either is a guess.
+ */
+async function notePrompt(
+  point: LatLng,
+  asked: readonly Bar[],
+  source: string,
+  sighting: Sighting | null
+): Promise<void> {
+  if (asked.length === 0) return;
+
+  const nearest = asked[0];
+  const seen = sighting?.[nearest.id];
+  const meters = distanceMeters(point, nearest);
+  const dwelledMs = seen ? Math.max(0, Date.now() - seen.since) : null;
+
+  void logEvent('prompt_shown', {
+    barId: asked.length === 1 ? nearest.id : null,
+    source,
+    venueCount: asked.length,
+    meters,
+    dwelledMs,
+  });
+
+  // The answer is written where the question was, so yes and no can be
+  // compared at the same distance and the same dwell.
+  await measurePending(meters, dwelledMs);
 }
 
 /** The last fix the app was given, wherever it came from. */
@@ -113,11 +158,18 @@ export async function syncStatusForLocation(
   if (left) {
     await writeStatus(null);
     await clearPendingVenue();
+    await stopAskingIfStillHere();
   }
 
   const candidates = venuesToConfirm(point, venues);
   if (candidates.length === 0) {
     await AsyncStorage.removeItem(SIGHTING_KEY);
+    if (immediate) {
+      // Asked by hand and answered with nothing. How far the nearest venue was
+      // is the whole question when someone is certain they were at one.
+      const nearest = nearestVenue(point, venues);
+      void logEvent('check_in_found_nothing', { meters: nearest?.meters ?? null });
+    }
     return { bar: null, changed: left };
   }
 
@@ -129,13 +181,19 @@ export async function syncStatusForLocation(
   }
 
   if (immediate) {
-    await promptForVenues(candidates, { force: true });
+    const asked = await promptForVenues(candidates, { force: true });
+    await notePrompt(
+      point,
+      asked,
+      'manual',
+      parseSighting(await AsyncStorage.getItem(SIGHTING_KEY))
+    );
     return { bar: null, changed: left };
   }
 
-  const dwelled = await dwelledVenues(candidates.map((venue) => venue.id));
-  const asked = candidates.filter((venue) => dwelled.includes(venue.id));
-  if (asked.length > 0) await promptForVenues(asked);
+  const { dwelled, sighting } = await dwelledVenues(candidates.map((venue) => venue.id));
+  const ready = candidates.filter((venue) => dwelled.includes(venue.id));
+  if (ready.length > 0) await notePrompt(point, await promptForVenues(ready), 'auto', sighting);
 
   return { bar: null, changed: left };
 }
@@ -148,18 +206,20 @@ export async function syncStatusForLocation(
  * which of those happened.
  */
 export async function diagnoseCheckIn(point: LatLng): Promise<CheckInReport> {
-  const [venues, fix, quiet, tracking, sighting] = await Promise.all([
+  const [venues, fix, quiet, tracking, sighting, blocked] = await Promise.all([
     barsNear(point),
     lastFix(),
     quietVenues(),
     isBackgroundUpdatesRunning(),
     AsyncStorage.getItem(SIGHTING_KEY).then(parseSighting),
+    promptsBlocked(),
   ]);
 
   const now = Date.now();
   return {
     fixAgeMs: fix ? Math.max(0, now - fix.at) : null,
     tracking,
+    blocked,
     nearest: nearestVenue(point, venues),
     venues: reportOnVenues(point, venues, {
       sighting,
@@ -171,16 +231,73 @@ export async function diagnoseCheckIn(point: LatLng): Promise<CheckInReport> {
   };
 }
 
-/** Checks the user in at a venue they confirmed they are at. */
-export async function checkInAt(barId: string): Promise<void> {
+/**
+ * Checks the user in at a venue they confirmed they are at. `source` is what
+ * they confirmed it from — a notification button, the picker in the app, a
+ * venue they added, or Join — which is the only way to tell whether the
+ * buttons on a notification are worth having.
+ */
+export async function checkInAt(barId: string, barName: string, source: string): Promise<void> {
+  const pending = await getPendingVenue();
+
   await writeStatus(barId);
   await allowVenue(barId);
   await clearPendingVenue();
+  await askLaterIfStillHere(barId, barName);
+
+  // A check-in only answers the prompt if that prompt offered this venue: Join
+  // and an added venue can land while an unrelated question is still standing,
+  // and counting those as answers would read as a prompt that worked.
+  const answers = pending?.choices.some((choice) => choice.barId === barId) ? pending : null;
+
+  void logEvent('check_in', {
+    barId,
+    source,
+    venueCount: answers?.choices.length ?? null,
+    answeredInMs: answers ? Date.now() - answers.promptedAt : null,
+    meters: answers?.meters ?? null,
+    dwelledMs: answers?.dwelledMs ?? null,
+  });
 }
 
 export async function clearStatus(): Promise<void> {
   await AsyncStorage.multiRemove([LAST_BAR_KEY, SIGHTING_KEY, FIX_KEY, TOUCH_KEY]);
   await supabase.rpc('set_current_bar', { p_bar_id: null });
   await clearPendingVenue();
+  await stopAskingIfStillHere();
   await flushPendingNotifications();
+}
+
+/**
+ * Ends a visit the user says is over, from the "Still at the bar?" question.
+ * `forTheNight` also stops the app asking about anywhere else until morning,
+ * which is the difference between leaving one bar and going home. `barId` is
+ * the venue the question was asked about: an answer can sit in the tray for
+ * hours, and by then the user may be somewhere else entirely, which is not a
+ * visit they said anything about.
+ */
+export async function checkOutByHand(barId: string, forTheNight: boolean): Promise<void> {
+  const current = await AsyncStorage.getItem(LAST_BAR_KEY);
+  if (current !== null && current !== barId) {
+    // Stale: only the mute carries, since "done for the night" is about the
+    // night rather than the venue.
+    if (forTheNight) await muteVenuePrompts();
+    return;
+  }
+
+  await clearStatus();
+  if (forTheNight) await muteVenuePrompts();
+}
+
+/**
+ * Takes "yes, still here" as the user saying so. Their phone may not be
+ * reporting at all — that is the case the question exists for — so without
+ * this the server would expire a visit the user has just confirmed twice.
+ */
+export async function confirmStillHere(barId: string): Promise<void> {
+  // Strict, unlike checking out: saying yes must never put a status back that
+  // the user has since ended elsewhere.
+  if ((await AsyncStorage.getItem(LAST_BAR_KEY)) !== barId) return;
+
+  await writeStatus(barId);
 }

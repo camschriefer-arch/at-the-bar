@@ -29,11 +29,12 @@ export async function joinState(barId: string): Promise<JoinState> {
 export async function checkInToJoin(barId: string): Promise<CurrentVisit> {
   const point = await getCurrentPoint();
   const near = allWithin(point, await barsNear(point));
-  if (!near.some((venue) => venue.id === barId)) {
+  const venue = near.find((bar) => bar.id === barId);
+  if (!venue) {
     throw new Error('You are not close enough to that bar to check in.');
   }
 
-  await checkInAt(barId);
+  await checkInAt(venue.id, venue.name, 'join');
   const visit = await currentVisit();
   if (!visit) throw new Error('Could not check you in there.');
   return visit;

@@ -74,9 +74,25 @@ your contacts already use the app, because we never see them.
 | Comments and emoji reactions you leave | Showing them under the photo, arrival or departure | You and everyone who can see that feed item |
 | People you blocked, posts you reported | Moderation | You, and whoever moderates reports |
 | Push notification token | Sending you the "are you here?" prompt and letting friends know you are out | Us only |
+| What the app asked you and what you answered | Working out whether the app asks too often, waits long enough before asking, and whether anyone uses the buttons on a notification | Us only |
 
 Photos are held in private storage and served through short-lived signed links;
 they are not publicly addressable on the internet.
+
+### How we measure the app
+
+The app records what it did and what you tapped: that it asked whether you were
+at a named venue, how long that venue had been nearby when it asked, roughly how
+far away you were, what you answered and how long you took, whether you opened a
+notification, and when a check-in you asked for found nothing. These are the
+only numbers we have for deciding how long the app should wait before asking and
+how close you have to be, and they are read in aggregate.
+
+This is still not a record of where you have been. The distance is to a venue
+the app had just asked you about, rounded to the nearest 10 metres, and no
+coordinate is stored with it, so these rows cannot be assembled into a route or
+a history of anywhere you did not confirm. They are never shown to another user,
+are visible only to us, and are deleted after 180 days.
 
 ## What we never do
 
@@ -99,6 +115,9 @@ they are not publicly addressable on the internet.
   see that you are not out.
 - We do not sell or rent personal data, use it for advertising, or use it to
   track you across other companies' apps and websites.
+- We use no third-party analytics or advertising software. Nothing about how you
+  use the app is sent to anyone else; what we measure is written to our own
+  database and read by us.
 
 ## Who else processes your data
 
@@ -141,7 +160,8 @@ has created an account, email us and we will delete it.
 
 Your status is transient — it exists only while you are checked in. Your profile,
 friendships and photos are kept until you delete them or ask us to delete your
-account. Unaccepted invites expire after 30 days.
+account. Unaccepted invites expire after 30 days. The records of what the app
+asked you and what you answered are deleted after 180 days.
 
 ## Changes to this policy
 

@@ -10,6 +10,12 @@ const CACHE_PREFIX = 'atb:venues:';
 // category, so they are dropped rather than read.
 const LEGACY_CACHE_PREFIX = 'atb:bars:';
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+// Anyone can add the venue they are standing in, and only the phone that added
+// it drops its own tile. A week-old tile on everybody else's phone cannot know
+// about it, so a venue a friend added minutes ago is invisible to the person
+// trying to join them in it. The flows a user drives by hand therefore refetch
+// a tile this old rather than trusting the week-long one.
+export const FRESH_TILE_MS = 60 * 1000;
 
 // Enough for the densest city tiles now that restaurants are in the catalog;
 // the server returns the rows nearest the tile first, so a cut-off tail is
@@ -18,13 +24,13 @@ const MAX_TILE_VENUES = 3000;
 
 type CachedTile = { fetchedAt: number; bars: Bar[] };
 
-async function readTile(key: string): Promise<CachedTile | null> {
+async function readTile(key: string, maxAgeMs: number): Promise<CachedTile | null> {
   const raw = await AsyncStorage.getItem(CACHE_PREFIX + key);
   if (!raw) return null;
 
   try {
     const parsed = JSON.parse(raw) as CachedTile;
-    if (Date.now() - parsed.fetchedAt > CACHE_TTL_MS) return null;
+    if (Date.now() - parsed.fetchedAt > maxAgeMs) return null;
     return parsed;
   } catch {
     return null;
@@ -34,10 +40,14 @@ async function readTile(key: string): Promise<CachedTile | null> {
 /**
  * Venues around `point`, from the local cache when possible. Only the coarse
  * tile the point falls in is sent to the server, never the point itself.
+ *
+ * `maxAgeMs` is how stale a cached tile may be before it is fetched again; pass
+ * `FRESH_TILE_MS` where the user is waiting on the answer and a venue added
+ * today has to be in it.
  */
-export async function barsNear(point: LatLng): Promise<Bar[]> {
+export async function barsNear(point: LatLng, maxAgeMs: number = CACHE_TTL_MS): Promise<Bar[]> {
   const key = tileKey(point);
-  const cached = await readTile(key);
+  const cached = await readTile(key, maxAgeMs);
   if (cached) return cached.bars;
 
   const box = tileBoundingBox(point);
@@ -49,7 +59,13 @@ export async function barsNear(point: LatLng): Promise<Bar[]> {
     max_rows: MAX_TILE_VENUES,
   });
 
-  if (error) throw error;
+  if (error) {
+    // A refetch asked for freshness, not for the only copy: a bar with no
+    // signal still has a usable week-old tile.
+    const stale = maxAgeMs < CACHE_TTL_MS ? await readTile(key, CACHE_TTL_MS) : null;
+    if (stale) return stale.bars;
+    throw error;
+  }
 
   const bars = (data ?? []) as Bar[];
   await AsyncStorage.setItem(

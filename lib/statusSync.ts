@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { logEvent } from './analytics';
-import { barsNear } from './barCache';
+import { barsNear, FRESH_TILE_MS } from './barCache';
 import { nearestVenue, reportOnVenues, type CheckInReport } from './diagnosis';
 import { distanceMeters, type LatLng } from './geo';
 import { isBackgroundUpdatesRunning } from './locationService';
@@ -145,7 +145,9 @@ export async function syncStatusForLocation(
 ): Promise<ResolvedStatus> {
   const moving = await noteFix({ point, at: Date.now(), speedMps, accuracyMeters });
   const lastBarId = await AsyncStorage.getItem(LAST_BAR_KEY);
-  const venues = await barsNear(point);
+  // A prompt the user asked for by hand refetches the tile: they may be
+  // standing in a venue somebody added today, which a cached tile cannot have.
+  const venues = await barsNear(point, immediate ? FRESH_TILE_MS : undefined);
   const current = stillAt(point, venues, lastBarId);
 
   if (current) {
@@ -208,7 +210,7 @@ export async function syncStatusForLocation(
  */
 export async function diagnoseCheckIn(point: LatLng): Promise<CheckInReport> {
   const [venues, fix, quiet, tracking, sighting, blocked] = await Promise.all([
-    barsNear(point),
+    barsNear(point, FRESH_TILE_MS),
     lastFix(),
     quietVenues(),
     isBackgroundUpdatesRunning(),

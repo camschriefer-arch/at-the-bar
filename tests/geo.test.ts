@@ -61,7 +61,7 @@ test('each tile size has its own keys', () => {
 });
 
 test('a fine tile tells apart points a coarse one shares', () => {
-  const blockAway = { lat: mollys.lat + 0.008, lng: mollys.lng };
+  const blockAway = { lat: mollys.lat + 0.004, lng: mollys.lng };
 
   assert.equal(tileKey(mollys, COARSE_TILE), tileKey(blockAway, COARSE_TILE));
   assert.notEqual(tileKey(mollys, FINE_TILE), tileKey(blockAway, FINE_TILE));

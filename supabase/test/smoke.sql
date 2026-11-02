@@ -158,7 +158,8 @@ select not bool_or(has_function_privilege('anon', p.oid, 'execute')) as anon_can
   where n.nspname = 'public'
     and p.proname in ('claim_push_batch', 'mark_push_sent', 'mark_push_failed',
       'drop_push_tokens', 'prune_notification_outbox', 'register_push_token',
-      'unregister_push_token', 'set_current_bar', 'bars_in_bbox', 'invite_by_email',
+      'unregister_push_token', 'set_current_bar', 'bars_in_bbox', 'bars_in_bbox_json',
+      'invite_by_email',
       'respond_to_friend_request', 'accept_invite', 'friend_feed', 'drink_posts_for',
       'remove_friend', 'claim_email_batch', 'mark_email_sent', 'mark_email_failed',
       'prune_email_outbox');

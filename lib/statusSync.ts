@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { logEvent } from './analytics';
-import { barsNear, FRESH_TILE_MS } from './barCache';
+import { barsNear, FRESH_TILE_MS, venueById } from './barCache';
 import { nearestVenue, reportOnVenues, type CheckInReport } from './diagnosis';
 import { distanceMeters, type LatLng } from './geo';
 import { isBackgroundUpdatesRunning } from './locationService';
@@ -80,6 +80,21 @@ async function notePrompt(
   await measurePending(meters, dwelledMs);
 }
 
+/**
+ * `venues` with the venue the user is checked in to, which a tile need not
+ * hold: one added since the tile was cached, or dropped from a dense city's
+ * tile. Missing from the tile is not proof the user left, and treating it as
+ * proof checked people out seconds after they arrived. A lookup that fails
+ * throws rather than reading as gone, so a bad connection leaves the status
+ * alone.
+ */
+async function withVenue(venues: Bar[], barId: string | null): Promise<Bar[]> {
+  if (!barId || venues.some((venue) => venue.id === barId)) return venues;
+
+  const venue = await venueById(barId);
+  return venue ? [...venues, venue] : venues;
+}
+
 /** The last fix the app was given, wherever it came from. */
 async function lastFix(): Promise<Fix | null> {
   const raw = await AsyncStorage.getItem(FIX_KEY);
@@ -148,7 +163,7 @@ export async function syncStatusForLocation(
   // A prompt the user asked for by hand refetches the tile: they may be
   // standing in a venue somebody added today, which a cached tile cannot have.
   const venues = await barsNear(point, immediate ? FRESH_TILE_MS : undefined);
-  const current = stillAt(point, venues, lastBarId);
+  const current = stillAt(point, await withVenue(venues, lastBarId), lastBarId);
 
   if (current) {
     await AsyncStorage.removeItem(SIGHTING_KEY);

@@ -3,8 +3,11 @@ import { test } from 'node:test';
 
 import {
   AT_BAR_RADIUS_METERS,
+  COARSE_TILE,
   distanceMeters,
+  FINE_TILE,
   nearestWithin,
+  TILE_SIZES,
   tileBoundingBox,
   tileKey,
 } from '../lib/geo.ts';
@@ -53,12 +56,32 @@ test('nearby points share a tile key', () => {
   assert.equal(tileKey(mollys), tileKey({ lat: mollys.lat + 0.001, lng: mollys.lng }));
 });
 
-// The box has to reach past the leave radius on every side, or a user standing
-// at the edge of a tile would not see the bar they are standing in.
-test('the tile bounding box clears the leave radius on each side', () => {
-  const box = tileBoundingBox(mollys);
-
-  assert.ok(box.minLat < mollys.lat && mollys.lat < box.maxLat);
-  assert.ok(box.minLng < mollys.lng && mollys.lng < box.maxLng);
-  assert.ok(distanceMeters({ lat: box.minLat, lng: mollys.lng }, mollys) > LEAVE_RADIUS_METERS);
+test('each tile size has its own keys', () => {
+  assert.notEqual(tileKey(mollys, COARSE_TILE), tileKey(mollys, FINE_TILE));
 });
+
+test('a fine tile tells apart points a coarse one shares', () => {
+  const blockAway = { lat: mollys.lat + 0.008, lng: mollys.lng };
+
+  assert.equal(tileKey(mollys, COARSE_TILE), tileKey(blockAway, COARSE_TILE));
+  assert.notEqual(tileKey(mollys, FINE_TILE), tileKey(blockAway, FINE_TILE));
+});
+
+// Every box has to reach past the leave radius on every side, or a user
+// standing at the edge of a tile would not see the bar they are standing in.
+for (const size of TILE_SIZES) {
+  test(`the ${size.degrees} degree tile box clears the leave radius on each side`, () => {
+    const box = tileBoundingBox(mollys, size);
+
+    assert.ok(box.minLat < mollys.lat && mollys.lat < box.maxLat);
+    assert.ok(box.minLng < mollys.lng && mollys.lng < box.maxLng);
+    for (const edge of [
+      { lat: box.minLat, lng: mollys.lng },
+      { lat: box.maxLat, lng: mollys.lng },
+      { lat: mollys.lat, lng: box.minLng },
+      { lat: mollys.lat, lng: box.maxLng },
+    ]) {
+      assert.ok(distanceMeters(edge, mollys) > LEAVE_RADIUS_METERS);
+    }
+  });
+}

@@ -40,6 +40,8 @@ import {
   signedAvatarUrl,
   signedDrinkUrls,
 } from '../../lib/photos';
+import { clearHome, getHome, setHome } from '../../lib/homeStore';
+import type { Home } from '../../lib/home';
 import { isSharingEnabled, setSharingEnabled } from '../../lib/sharing';
 import { reportTrouble } from '../../lib/support';
 import {
@@ -91,6 +93,7 @@ export default function ProfileScreen() {
   const [addingVenue, setAddingVenue] = useState(false);
   const [nothingNearby, setNothingNearby] = useState(false);
   const [report, setReport] = useState<CheckInReport | null>(null);
+  const [home, setHomeState] = useState<Home | null>(null);
   const [trouble, setTrouble] = useState(false);
   const [note, setNote] = useState('');
   const [sent, setSent] = useState(false);
@@ -119,6 +122,7 @@ export default function ProfileScreen() {
         fetchBlockedUsers(),
       ]);
       setProfile(me);
+      setHomeState(await getHome());
       setBlocked(blocks);
       setTopBars(frequented);
       setBar(status.bar);
@@ -323,6 +327,33 @@ export default function ProfileScreen() {
       setBlocked((current) => current.filter((entry) => entry.id !== person.id));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not unblock');
+    }
+  };
+
+  /**
+   * Marks where the user is standing as home, so the venues around it stop
+   * asking. The point is written to this phone only: a home address is the
+   * one coordinate worth guarding hardest, and nothing about it is sent.
+   */
+  const markHome = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      setHomeState(await setHome(await getCurrentPoint()));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not read where you are');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const forgetHome = async () => {
+    setError(null);
+    try {
+      await clearHome();
+      setHomeState(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not forget home');
     }
   };
 
@@ -574,6 +605,35 @@ export default function ProfileScreen() {
             </View>
           </>
         ) : null}
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.label}>Home</Text>
+        <Text style={styles.muted}>
+          {home
+            ? 'Marked. You will not be asked about bars while you are here.'
+            : 'Mark where you live and the app stops asking whether you are at the bar downstairs.'}
+        </Text>
+        <Text style={styles.fineprint}>
+          Stays on this phone. It is never sent to us, and you still see friends checking in
+          around you as usual.
+        </Text>
+        <View style={styles.actions}>
+          <Button
+            title={home ? 'Move home to where I am' : 'This is my home'}
+            variant="secondary"
+            onPress={() => void markHome()}
+            disabled={busy}
+          />
+          {home ? (
+            <Button
+              title="Forget home"
+              variant="secondary"
+              onPress={() => void forgetHome()}
+              disabled={busy}
+            />
+          ) : null}
+        </View>
       </View>
 
       <View style={styles.section}>

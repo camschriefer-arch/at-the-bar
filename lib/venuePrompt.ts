@@ -2,6 +2,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 
 import { logEvent } from './analytics';
+import { atHome } from './homeStore';
+import type { LatLng } from './geo';
 import {
   answerPrompt,
   countPrompt,
@@ -167,8 +169,18 @@ export async function muteVenuePrompts(now = Date.now()): Promise<void> {
   await clearPendingVenue();
 }
 
-/** Why nothing is being raised at all right now, or null if it would be. */
-export async function promptsBlocked(now = Date.now()): Promise<PromptBlock | null> {
+/**
+ * Why nothing is being raised at all right now, or null if it would be. Given
+ * `point`, home comes first: someone sitting at home is not out, whatever
+ * their allowance says, and the venues around their own front door are the
+ * ones the app would otherwise ask about every night.
+ */
+export async function promptsBlocked(
+  now = Date.now(),
+  point: LatLng | null = null
+): Promise<PromptBlock | null> {
+  if (point && (await atHome(point))) return 'home';
+
   const [mute, tally] = await Promise.all([
     AsyncStorage.getItem(MUTE_KEY).then(parseMute),
     AsyncStorage.getItem(TALLY_KEY).then(parseTally),
@@ -234,15 +246,16 @@ export async function allowVenue(barId: string): Promise<void> {
  * asked about earlier is a new visit, and one turned down stays quiet for a
  * fortnight. A day's worth of prompts, or a user who said they are not out,
  * stops the lot: the quiet periods are per venue and cannot see how many
- * notifications a person has had. `force` re-asks through all of it, for a
- * prompt the user asked for by hand. Returns the venues actually asked about,
+ * notifications a person has had, and `at` is where the user is, so a venue
+ * near the home they marked is not raised at all. `force` re-asks through all
+ * of it, for a prompt the user asked for by hand. Returns the venues actually asked about,
  * which is what the caller measures rather than the list it offered.
  */
 export async function promptForVenues(
   candidates: readonly Bar[],
-  { force = false } = {}
+  { force = false, at = null }: { force?: boolean; at?: LatLng | null } = {}
 ): Promise<Bar[]> {
-  if (!force && (await promptsBlocked()) !== null) return [];
+  if (!force && (await promptsBlocked(Date.now(), at)) !== null) return [];
 
   const quiet = force
     ? candidates.map(() => false)

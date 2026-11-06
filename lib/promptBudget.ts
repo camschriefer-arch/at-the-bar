@@ -116,7 +116,7 @@ export function ignoredPrompt(tally: PromptTally | null, now: number): boolean {
 }
 
 /** Why the app is not going to ask, or null if it is free to. */
-export type PromptBlock = 'muted' | 'capped' | 'ignored';
+export type PromptBlock = 'home' | 'muted' | 'capped' | 'ignored';
 
 /**
  * Whether anything may be raised at all right now. A mute the user asked for

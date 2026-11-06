@@ -26,8 +26,10 @@ export function CheckInReportCard({ report, onAskAgain, busy }: CheckInReportCar
   // The button has to be there whenever the summary tells the user to press it,
   // and a day's mute or a spent allowance is the one case where no venue around
   // them looks silenced at all.
+  // Home is the exception: clearing the quiet periods would not lift it, and
+  // the summary sends the user to the Home card instead.
   const silenced =
-    report.blocked !== null ||
+    (report.blocked !== null && report.blocked !== 'home') ||
     report.venues.some(
       (venue) => venue.verdict === 'asked-already' || venue.verdict === 'turned-down'
     );

@@ -8,6 +8,7 @@ import { Button } from '../../components/Button';
 import { CheckInReportCard } from '../../components/CheckInReportCard';
 import { CompanionModal } from '../../components/CompanionModal';
 import { DrinkGallery } from '../../components/DrinkGallery';
+import { Field } from '../../components/Field';
 import { TopBars } from '../../components/TopBars';
 import { UploadDrinkModal } from '../../components/UploadDrinkModal';
 import { fetchMyProfile, fetchMyStatus, fetchTopBars, forgetBar } from '../../lib/api';
@@ -40,6 +41,7 @@ import {
   signedDrinkUrls,
 } from '../../lib/photos';
 import { isSharingEnabled, setSharingEnabled } from '../../lib/sharing';
+import { reportTrouble } from '../../lib/support';
 import {
   checkInAt,
   clearStatus,
@@ -90,6 +92,8 @@ export default function ProfileScreen() {
   const [nothingNearby, setNothingNearby] = useState(false);
   const [report, setReport] = useState<CheckInReport | null>(null);
   const [trouble, setTrouble] = useState(false);
+  const [note, setNote] = useState('');
+  const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -349,6 +353,25 @@ export default function ProfileScreen() {
 
     setTrouble(true);
     await explain();
+  };
+
+  /**
+   * Sends what the user says went wrong along with the report they are looking
+   * at. Anything is worth reporting, not only a venue that never asked: the
+   * diagnostics come along whatever the problem turns out to be.
+   */
+  const sendTrouble = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await reportTrouble(note, report);
+      setNote('');
+      setSent(true);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not send that');
+    } finally {
+      setBusy(false);
+    }
   };
 
   const askAgain = async () => {
@@ -631,7 +654,8 @@ export default function ProfileScreen() {
         {trouble ? (
           <>
             <Text style={styles.fineprint}>
-              If you sat somewhere and were never asked about it, this says why.
+              Something not working? Check where the app thinks you are, then tell us what
+              happened and we will look at it.
             </Text>
             <Button
               title={report ? 'Check again' : 'Check where I am'}
@@ -646,6 +670,31 @@ export default function ProfileScreen() {
                 busy={busy}
               />
             ) : null}
+
+            <Field
+              label="What went wrong?"
+              value={note}
+              onChangeText={(text) => {
+                setNote(text);
+                setSent(false);
+              }}
+              placeholder="It checked me out as soon as I arrived"
+              multiline
+              numberOfLines={4}
+              maxLength={2000}
+              style={styles.note}
+            />
+            <Button
+              title="Send this to the developer"
+              variant="secondary"
+              onPress={() => void sendTrouble()}
+              disabled={busy || note.trim().length === 0}
+            />
+            <Text style={styles.fineprint}>
+              {sent
+                ? 'Sent \u2014 thank you. We will have what the app was thinking at the time.'
+                : 'Sends what you write and the report above. Never where you are, only how far off things were.'}
+            </Text>
           </>
         ) : null}
       </View>
@@ -672,6 +721,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
+  },
+  note: {
+    minHeight: 96,
+    textAlignVertical: 'top',
   },
   trouble: {
     color: colors.muted,

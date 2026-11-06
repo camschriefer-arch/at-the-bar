@@ -189,3 +189,22 @@ select count(*) = 0 as leaving_closes_every_visit from check_ins
 select visits = 2 and total_minutes >= 0 as top_bars_reports_time
   from top_bars('11111111-1111-1111-1111-111111111111');
 reset role;
+
+-- A trouble report is stored with the diagnostics and mailed to whoever is
+-- listed for support; the note is escaped so it cannot write the mail's HTML.
+insert into support_recipients (email) values ('support@example.com');
+set role authenticated;
+set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+select report_trouble('<b>never asked me</b>', '{"tracking": true}'::jsonb, '1.0.2', 'ios 18')
+  is not null as trouble_report_filed;
+reset role;
+select count(*) = 1 as trouble_report_stored from trouble_reports
+  where user_id = '11111111-1111-1111-1111-111111111111'
+    and note = '<b>never asked me</b>'
+    and report ? 'tracking';
+select count(*) = 1 as trouble_report_mailed from email_outbox
+  where recipient_email = 'support@example.com'
+    and body_html like '%&lt;b&gt;never asked me&lt;/b&gt;%'
+    and body_html not like '%<b>never asked me</b>%';
+select not has_function_privilege('anon', 'report_trouble(text, jsonb, text, text)', 'execute')
+  as anon_cannot_report_trouble;

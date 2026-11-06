@@ -245,13 +245,16 @@ export async function checkInAt(barId: string, barName: string, source: string):
   await writeStatus(barId);
   await allowVenue(barId);
   await clearPendingVenue();
-  await askLaterIfStillHere(barId, barName);
 
   // A check-in only answers the prompt if that prompt offered this venue: Join
   // and an added venue can land while an unrelated question is still standing,
-  // and counting those as answers would read as a prompt that worked.
+  // and counting those as answers would read as a prompt that worked. Recorded
+  // before the reminders are scheduled, so a refused notification cannot leave
+  // an answered prompt looking ignored and silence the rest of the day.
   const answers = pending?.choices.some((choice) => choice.barId === barId) ? pending : null;
   if (answers) await notePromptAnswered();
+
+  await askLaterIfStillHere(barId, barName);
 
   void logEvent('check_in', {
     barId,

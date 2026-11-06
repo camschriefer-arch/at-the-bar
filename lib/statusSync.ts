@@ -212,7 +212,9 @@ export async function syncStatusForLocation(
 
   const { dwelled, sighting } = await dwelledVenues(candidates.map((venue) => venue.id));
   const ready = candidates.filter((venue) => dwelled.includes(venue.id));
-  if (ready.length > 0) await notePrompt(point, await promptForVenues(ready), 'auto', sighting);
+  if (ready.length > 0) {
+    await notePrompt(point, await promptForVenues(ready, { at: point }), 'auto', sighting);
+  }
 
   return { bar: null, changed: left };
 }
@@ -231,7 +233,7 @@ export async function diagnoseCheckIn(point: LatLng): Promise<CheckInReport> {
     quietVenues(),
     isBackgroundUpdatesRunning(),
     AsyncStorage.getItem(SIGHTING_KEY).then(parseSighting),
-    promptsBlocked(),
+    promptsBlocked(Date.now(), point),
   ]);
 
   const now = Date.now();

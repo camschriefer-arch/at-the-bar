@@ -44,6 +44,10 @@ export function describeTracking(report: CheckInReport): string {
 
 /** The one sentence to lead with: why no prompt came. */
 export function summarise(report: CheckInReport): string {
+  if (report.blocked === 'home') {
+    return 'You are at the home you marked, so nothing is raised here. Clear home above if you want to be asked here too.';
+  }
+
   if (report.blocked === 'muted') {
     return 'You said you were not out today, so nothing will be raised until the morning. Ask me again to undo that.';
   }

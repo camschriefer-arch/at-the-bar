@@ -6,7 +6,7 @@ import { BarPicker } from './BarPicker';
 import { Button } from './Button';
 import { Field } from './Field';
 import { Stars } from './Stars';
-import { barsNear } from '../lib/barCache';
+import { barsNear, FRESH_TILE_MS } from '../lib/barCache';
 import type { LatLng } from '../lib/geo';
 import { getCurrentPoint } from '../lib/locationService';
 import { choosePhoto, createDrinkPost, type PickedPhoto } from '../lib/photos';
@@ -51,7 +51,7 @@ export function UploadDrinkModal({ visible, userId, onClose, onSaved }: UploadDr
     // Best effort: without location permission the picker falls back to
     // catalog-wide name search.
     getCurrentPoint()
-      .then(async (point) => ({ point, bars: await barsNear(point) }))
+      .then(async (point) => ({ point, bars: await barsNear(point, FRESH_TILE_MS) }))
       .then(({ point, bars }) => {
         if (cancelled) return;
         setOrigin(point);

@@ -1,7 +1,7 @@
-import { barsNear } from './barCache';
+import { venueById } from './barCache';
 import { currentVisit, setVisitCompanions, visitCompanions } from './companions';
 import { withCompanion } from './companionText';
-import { allWithin } from './geo';
+import { nearestWithin } from './geo';
 import { getCurrentPoint } from './locationService';
 import { checkInAt } from './statusSync';
 import type { CurrentVisit } from './types';
@@ -24,13 +24,15 @@ export async function joinState(barId: string): Promise<JoinState> {
 /**
  * Checks the user in at the venue they are joining. A check-in is a claim
  * about where someone is, so tapping Join is held to the same radius as every
- * other one rather than being taken at its word.
+ * other one rather than being taken at its word. The one venue is fetched by
+ * id rather than looked for in the tile, which cannot be relied on to hold it:
+ * the bar being joined is often one the friend added minutes earlier, and a
+ * dense city's tile drops venues anyway.
  */
 export async function checkInToJoin(barId: string): Promise<CurrentVisit> {
   const point = await getCurrentPoint();
-  const near = allWithin(point, await barsNear(point));
-  const venue = near.find((bar) => bar.id === barId);
-  if (!venue) {
+  const venue = await venueById(barId);
+  if (!venue || !nearestWithin(point, [venue])) {
     throw new Error('You are not close enough to that bar to check in.');
   }
 

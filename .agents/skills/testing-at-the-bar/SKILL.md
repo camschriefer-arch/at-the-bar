@@ -296,7 +296,8 @@ To test friend-detail UI, re-set the other user's status with service-role SQL:
   (`/auth/v1/token?grant_type=password`) and `POST /rest/v1/rpc/set_current_bar {p_bar_id}`.
   This is a diagnostic/fixture shortcut only — always label such a state as not UI-proven.
 - **After re-seeding `bars`, always clear the app's venue cache or check-in will fail.** The app
-  caches nearby venues per geo-tile in AsyncStorage (`atb:venues:<x>:<y>`, plus `atb:pendingVenue`,
+  caches nearby venues per geo-tile in AsyncStorage (`atb:tiles:<size>:<x>:<y>`, one entry per tile
+  size, formerly `atb:venues:<x>:<y>`, plus `atb:pendingVenue`,
   `atb:promptedVenues`, `atb:declinedVenues`, `atb:sighting`). If the seed deleted/recreated the
   bar rows, the prompt still offers the OLD uuid and `set_current_bar` returns **400 / `unknown
   bar <uuid>`**; the UI only shows a generic red "Could not check you in" at the very BOTTOM of
@@ -304,7 +305,7 @@ To test friend-detail UI, re-set the other user's status with service-role SQL:
   dump unless you scroll all the way down. Inspect/clear the keys with:
   `adb shell "run-as com.atthebar.app sqlite3 databases/RKStorage 'select key, substr(value,1,200)
   from catalystLocalStorage'"` and a matching `delete from catalystLocalStorage where key like
-  'atb:venues%' or key in (...)` while the app is force-stopped (keep `sb-10-auth-token` to stay
+  'atb:tiles%' or key in (...)` while the app is force-stopped (keep `sb-10-auth-token` to stay
   signed in), then relaunch.
 - To see what a failing Supabase call returned, tail `docker logs -f supabase_kong_at-the-bar`
   (method/path/status) and `docker logs supabase_db_at-the-bar` (the actual `ERROR:` + statement).

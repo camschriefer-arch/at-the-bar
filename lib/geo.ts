@@ -7,17 +7,22 @@ export const AT_BAR_RADIUS_MILES = 0.1;
 export const AT_BAR_RADIUS_METERS = AT_BAR_RADIUS_MILES * 1609.344;
 
 /**
- * Size of the coarse tile the client asks the server for. The device never
- * sends its precise position: it rounds down to a tile and filters locally.
+ * The tile sizes the client asks the server for, coarsest first. The device
+ * never sends its precise position: it rounds down to a tile and filters
+ * locally. `padding` is how far outside its tile a request reaches, so a
+ * device at a tile edge still sees venues just over the boundary; both
+ * paddings clear the check-in radius several times over.
+ *
+ * A tile of a dense city holds more venues than the server will return, and
+ * the ones it drops are the ones furthest from the tile centre — which can be
+ * the ones the user is standing in. So a tile that comes back full is asked
+ * for again at the finer size, where even central Manhattan fits.
  */
-export const TILE_DEGREES = 0.02;
+export type TileSize = { degrees: number; padding: number };
 
-/**
- * How far outside its tile a request reaches, so a device at a tile edge still
- * sees venues just over the boundary. ~550 m covers the check-in radius several
- * times over without pulling in a city's worth of restaurants.
- */
-export const TILE_PADDING_DEGREES = 0.005;
+export const COARSE_TILE: TileSize = { degrees: 0.02, padding: 0.005 };
+export const FINE_TILE: TileSize = { degrees: 0.005, padding: 0.004 };
+export const TILE_SIZES: readonly TileSize[] = [COARSE_TILE, FINE_TILE];
 
 const EARTH_RADIUS_METERS = 6371008.8;
 
@@ -45,22 +50,22 @@ export function distanceMeters(a: LatLng, b: LatLng): number {
 }
 
 /** Identifier of the tile a point falls in, used as the bar cache key. */
-export function tileKey(point: LatLng): string {
-  const lat = Math.floor(point.lat / TILE_DEGREES);
-  const lng = Math.floor(point.lng / TILE_DEGREES);
-  return `${lat}:${lng}`;
+export function tileKey(point: LatLng, size: TileSize = COARSE_TILE): string {
+  const lat = Math.floor(point.lat / size.degrees);
+  const lng = Math.floor(point.lng / size.degrees);
+  return `${size.degrees}:${lat}:${lng}`;
 }
 
 /** The tile containing `point`, padded on each side. */
-export function tileBoundingBox(point: LatLng): BoundingBox {
-  const lat = Math.floor(point.lat / TILE_DEGREES) * TILE_DEGREES;
-  const lng = Math.floor(point.lng / TILE_DEGREES) * TILE_DEGREES;
+export function tileBoundingBox(point: LatLng, size: TileSize = COARSE_TILE): BoundingBox {
+  const lat = Math.floor(point.lat / size.degrees) * size.degrees;
+  const lng = Math.floor(point.lng / size.degrees) * size.degrees;
 
   return {
-    minLat: lat - TILE_PADDING_DEGREES,
-    minLng: lng - TILE_PADDING_DEGREES,
-    maxLat: lat + TILE_DEGREES + TILE_PADDING_DEGREES,
-    maxLng: lng + TILE_DEGREES + TILE_PADDING_DEGREES,
+    minLat: lat - size.padding,
+    minLng: lng - size.padding,
+    maxLat: lat + size.degrees + size.padding,
+    maxLng: lng + size.degrees + size.padding,
   };
 }
 

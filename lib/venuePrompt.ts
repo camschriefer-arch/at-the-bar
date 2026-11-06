@@ -3,6 +3,7 @@ import * as Notifications from 'expo-notifications';
 
 import { logEvent } from './analytics';
 import {
+  answerPrompt,
   countPrompt,
   nextMorning,
   parseMute,
@@ -135,9 +136,23 @@ export async function declinePendingVenue(source = 'app'): Promise<void> {
       meters: pending?.meters ?? null,
       dwelledMs: pending?.dwelledMs ?? null,
     });
+
+    await notePromptAnswered();
   }
 
   await clearPendingVenue();
+}
+
+/**
+ * Records that the user answered what they were asked, whichever way. An
+ * unanswered prompt costs the rest of the day most of its allowance, so the
+ * app has to know the difference between being turned down and being ignored.
+ */
+export async function notePromptAnswered(now = Date.now()): Promise<void> {
+  await AsyncStorage.setItem(
+    TALLY_KEY,
+    JSON.stringify(answerPrompt(parseTally(await AsyncStorage.getItem(TALLY_KEY)), now))
+  );
 }
 
 /**
@@ -148,6 +163,7 @@ export async function declinePendingVenue(source = 'app'): Promise<void> {
  */
 export async function muteVenuePrompts(now = Date.now()): Promise<void> {
   await AsyncStorage.setItem(MUTE_KEY, JSON.stringify({ until: nextMorning(now) }));
+  if ((await getPendingVenue()) !== null) await notePromptAnswered(now);
   await clearPendingVenue();
 }
 

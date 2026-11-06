@@ -16,6 +16,7 @@ import {
   getPendingVenue,
   measurePending,
   muteVenuePrompts,
+  notePromptAnswered,
   promptForVenues,
   promptsBlocked,
   quietenVenue,
@@ -250,6 +251,7 @@ export async function checkInAt(barId: string, barName: string, source: string):
   // and an added venue can land while an unrelated question is still standing,
   // and counting those as answers would read as a prompt that worked.
   const answers = pending?.choices.some((choice) => choice.barId === barId) ? pending : null;
+  if (answers) await notePromptAnswered();
 
   void logEvent('check_in', {
     barId,

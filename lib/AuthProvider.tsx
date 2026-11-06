@@ -1,6 +1,7 @@
 import type { Session } from '@supabase/supabase-js';
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
+import { clearHome } from './homeStore';
 import { stopBackgroundUpdates } from './locationService';
 import { unregisterPushNotifications } from './notifications';
 import { setSharingEnabled } from './sharing';
@@ -60,6 +61,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // The quiet periods, the mute and the day's prompt tally are about
           // the person who answered them, not the phone.
           askAgainEverywhere(),
+          // So is the home they marked: on a shared phone the next account
+          // would otherwise be silenced at a stranger's front door.
+          clearHome(),
         ]);
 
         const { error } = await supabase.auth.signOut();

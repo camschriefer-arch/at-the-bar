@@ -40,7 +40,7 @@ import {
   signedAvatarUrl,
   signedDrinkUrls,
 } from '../../lib/photos';
-import { clearHome, getHome, setHome } from '../../lib/homeStore';
+import { atHome, clearHome, getHome, setHome } from '../../lib/homeStore';
 import type { Home } from '../../lib/home';
 import { isSharingEnabled, setSharingEnabled } from '../../lib/sharing';
 import { reportTrouble } from '../../lib/support';
@@ -62,6 +62,7 @@ import type {
 } from '../../lib/types';
 import {
   askAgainEverywhere,
+  clearPendingVenue,
   declinePendingVenue,
   getPendingVenue,
   type PendingChoice,
@@ -339,7 +340,15 @@ export default function ProfileScreen() {
     setBusy(true);
     setError(null);
     try {
-      setHomeState(await setHome(await getCurrentPoint()));
+      const point = await getCurrentPoint();
+      setHomeState(await setHome(point));
+      // A question already on screen is about a venue here, which is exactly
+      // what the user has just said to stop asking about.
+      if (await atHome(point)) {
+        await clearPendingVenue();
+        setPending(null);
+        setReport(null);
+      }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not read where you are');
     } finally {

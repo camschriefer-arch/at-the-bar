@@ -124,6 +124,10 @@ test('a muted day and a spent allowance are said before anything about venues', 
   );
   assert.match(
     summarise({ fixAgeMs: 60_000, tracking: true, blocked: 'capped', nearest: null, venues }),
-    /most the app asks in a day/
+    /today's prompts/
+  );
+  assert.match(
+    summarise({ fixAgeMs: 60_000, tracking: true, blocked: 'ignored', nearest: null, venues }),
+    /three hours/
   );
 });

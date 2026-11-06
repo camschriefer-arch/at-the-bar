@@ -1,6 +1,6 @@
 import type { CheckInReport, VenueReport } from './diagnosis.ts';
 import { formatMinutes } from './duration.ts';
-import { DAILY_PROMPT_CAP } from './promptBudget.ts';
+import { DAILY_PROMPT_CAP, IGNORED_PROMPT_CAP } from './promptBudget.ts';
 import { DWELL_MS } from './venues.ts';
 
 const FEET_PER_METER = 3.28084;
@@ -49,7 +49,11 @@ export function summarise(report: CheckInReport): string {
   }
 
   if (report.blocked === 'capped') {
-    return `You have already been asked ${DAILY_PROMPT_CAP} times today, which is the most the app asks in a day. Ask me again to clear that.`;
+    return `You have already had today's prompts: ${DAILY_PROMPT_CAP} a day, or ${IGNORED_PROMPT_CAP} once one goes unanswered. Ask me again to clear that.`;
+  }
+
+  if (report.blocked === 'ignored') {
+    return 'You did not answer the last prompt, so the app waits three hours before asking again, and only once more today. Ask me again to clear that.';
   }
 
   if (report.venues.length === 0) {

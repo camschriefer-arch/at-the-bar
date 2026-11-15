@@ -59,9 +59,10 @@ Your coordinates never leave your device. The app downloads the venues for a coa
    SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... python3 scripts/import_places.py --states MA,NY
    SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... python3 scripts/import_places.py   # 50 states + DC
    SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... python3 scripts/import_places.py --country ES
+   SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... python3 scripts/import_places.py --bbox=-0.51,51.28,0.33,51.69  # Greater London
    ```
 
-   Venues come from the newest [Overture Maps](https://overturemaps.org) release, queried straight off S3 as GeoParquet — about 350k US bars, pubs and restaurants, plus Spain. `--country` takes any ISO code Overture addresses carry; only the US is split into regions, so `--states` applies to it alone. The import is idempotent (keyed on `source, source_id`), so re-running it only refreshes rows. A full run also calls `prune_unused_osm_bars()` to drop the OpenStreetMap rows Overture replaced, keeping any that a check-in or a drink photo still points at; pass `--keep-osm` to skip that.
+   Venues come from the newest [Overture Maps](https://overturemaps.org) release, queried straight off S3 as GeoParquet — about 350k US bars, pubs and restaurants, plus Spain. `--country` takes any ISO code Overture addresses carry; only the US is split into regions, so `--states` applies to it alone. `--bbox` imports one city instead, taking whatever falls inside `minLng,minLat,maxLng,maxLat` regardless of the country an address claims. The import is idempotent (keyed on `source, source_id`), so re-running it only refreshes rows. A full run also calls `prune_unused_osm_bars()` to drop the OpenStreetMap rows Overture replaced, keeping any that a check-in or a drink photo still points at; pass `--keep-osm` to skip that.
 
    A venue someone adds from the app carries its own address, geocoded on the phone as it is saved. Venues added before that shipped have coordinates but no address; fill them in once with:
 

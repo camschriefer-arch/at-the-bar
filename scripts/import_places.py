@@ -9,7 +9,12 @@ Usage:
   SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... python3 scripts/import_places.py
   python3 scripts/import_places.py --states MA,NY   # subset, useful for a first run
   python3 scripts/import_places.py --country ES     # every venue in Spain
+  python3 scripts/import_places.py --bbox -0.51,51.28,0.33,51.69   # Greater London
   python3 scripts/import_places.py --keep-osm       # leave the old OSM rows in place
+
+A bbox is minLng,minLat,maxLng,maxLat and takes whatever falls inside it,
+whatever country an address claims, which is how a city rather than a country
+gets imported.
 
 Needs `pip install duckdb`, and an Overture release from 2026-09 onwards, where the
 category of a place lives in `taxonomy` rather than the older `categories`.
@@ -91,10 +96,16 @@ def latest_release() -> str:
     return sorted(releases)[-1]
 
 
-def rows_for(release: str, country: str, states: list[str] | None):
+def rows_for(
+    release: str,
+    country: str,
+    states: list[str] | None,
+    bbox: tuple[float, float, float, float] | None = None,
+):
     """Streams a country's venues, already mapped to `bars` rows.
 
     `states` narrows the import to those regions; None takes the whole country.
+    `bbox` replaces the country filter with a geographic one, for a single city.
     """
     import duckdb
 
@@ -106,6 +117,15 @@ def rows_for(release: str, country: str, states: list[str] | None):
     # a barber shop as a bar.
     # The lists are the script's own constants, and the country and region codes
     # are checked before they get here.
+    if bbox is not None:
+        min_lng, min_lat, max_lng, max_lat = bbox
+        place_filter = (
+            f"bbox.xmin between {min_lng} and {max_lng}"
+            f" and bbox.ymin between {min_lat} and {max_lat}"
+        )
+    else:
+        place_filter = f"addresses[1].country = '{country}'"
+
     region_filter = ""
     if states is not None:
         state_list = ", ".join(f"'{code}'" for code in states)
@@ -130,7 +150,7 @@ def rows_for(release: str, country: str, states: list[str] | None):
         from read_parquet(
           's3://{BUCKET}/release/{release}/theme=places/type=place/*'
         )
-        where addresses[1].country = '{country}'
+        where {place_filter}
           {region_filter}
           and names.primary is not null
           and (
@@ -217,6 +237,10 @@ def main() -> None:
         default="US",
         help="ISO country code to import, e.g. ES (default: US)",
     )
+    parser.add_argument(
+        "--bbox",
+        help="minLng,minLat,maxLng,maxLat to import one city instead of a country",
+    )
     parser.add_argument("--release", help="Overture release, e.g. 2026-08-19.0")
     parser.add_argument(
         "--keep-osm",
@@ -245,14 +269,32 @@ def main() -> None:
         if unknown:
             raise SystemExit(f"Unknown state codes: {', '.join(unknown)}")
 
+    bbox: tuple[float, float, float, float] | None = None
+    if arguments.bbox:
+        if arguments.states:
+            raise SystemExit("--bbox and --states cannot both be given.")
+        try:
+            west, south, east, north = (float(part) for part in arguments.bbox.split(","))
+        except ValueError:
+            raise SystemExit("Expected --bbox as minLng,minLat,maxLng,maxLat.") from None
+        if not (-180 <= west < east <= 180 and -90 <= south < north <= 90):
+            raise SystemExit(f"--bbox {arguments.bbox!r} is not a west,south,east,north box.")
+        bbox = (west, south, east, north)
+        states = None
+
     release = arguments.release or latest_release()
-    scope = f"{len(states)} states" if states is not None else "all regions"
-    print(f"Overture release {release}, {country}, {scope}")
+    if bbox is not None:
+        scope = f"bbox {arguments.bbox}"
+    elif states is not None:
+        scope = f"{country}, {len(states)} states"
+    else:
+        scope = f"{country}, all regions"
+    print(f"Overture release {release}, {scope}")
 
     upsert_url = f"{url.rstrip('/')}/rest/v1/bars?on_conflict=source,source_id"
     total = 0
 
-    for rows in rows_for(release, country, states):
+    for rows in rows_for(release, country, states, bbox):
         post(upsert_url, key, rows, "resolution=merge-duplicates,return=minimal")
         total += len(rows)
         print(f"\r{total} venues", end="", flush=True)
